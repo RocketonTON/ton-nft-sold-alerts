@@ -1,7 +1,7 @@
-import time
-import traceback
 import requests
 import asyncio
+import time
+import traceback
 
 from web_server import run_in_background
 from pathlib import Path
@@ -12,27 +12,40 @@ from functions import parse_sale_stack
 from nftData import get_nft_data, get_collection_floor
 from tgMessage import tg_message
 
+# === GLOBAL TON CLIENT ===
+_ton_client = None
 
-async def get_client():
-    config = requests.get(ton_config_url).json()
-    keystore_dir = '/tmp/ton_keystore'
-    Path(keystore_dir).mkdir(parents=True,
-                             exist_ok=True)
+async def get_global_client():
+    """Crea o restituisce un client TON globale condiviso."""
+    global _ton_client
+    if _ton_client is None:
+        print("[INIT] Creating global TonLibClient...")
+        config = requests.get(ton_config_url).json()
+        keystore_dir = '/tmp/ton_keystore'
+        Path(keystore_dir).mkdir(parents=True, exist_ok=True)
+        
+        _ton_client = TonlibClient(ls_index=2,
+                                   config=config,
+                                   keystore=keystore_dir,
+                                   tonlib_timeout=10)
+        await _ton_client.init()
+        print("[INIT] Global TonLibClient created successfully.")
+    return _ton_client
 
-    client = TonlibClient(ls_index=2,
-                          config=config,
-                          keystore=keystore_dir,
-                          tonlib_timeout=10)
-    await client.init()
-
-    return client
+async def close_global_client():
+    """Chiude il client TON globale (usato all'uscita)."""
+    global _ton_client
+    if _ton_client:
+        await _ton_client.close()
+        _ton_client = None
 
 
 async def royalty_trs(royalty_address):
     utimes = list()
     last_utime = int(open(f'{current_path}/lastUtime', 'r').read())
 
-    client = await get_client()
+    ### MODIFICA 1: Usa get_global_client(), NON get_client()
+    client = await get_global_client()
 
     # 1. INIZIALIZZA `trs` a None PRIMA del try
     trs = None
@@ -40,13 +53,14 @@ async def royalty_trs(royalty_address):
     try:
         trs = await client.get_transactions(account=royalty_address,
                                             limit=trs_limit)
+        print(f"[royalty_trs] Trovate {len(trs) if trs else 0} transazioni per {royalty_address[-6:]}")  # Log utile
 
     except Exception as e:
         print(f'Get Request for ({royalty_address}) address Failed! Check the logs\n{e}\n\n')
         
-        # DOPO aver stampato l'errore, ESCI dalla funzione
-        await client.close()
-        return  # <-- AGGIUNGI QUESTA RIGA! Esce senza restituire utimes.
+        ### MODIFICA 2: NON chiudere il client qui! Solo return.
+        # RIMUOVI: await client.close()
+        return None  # <-- Ritorna None esplicitamente
 
     if trs is not None:
         for tr in trs[::-1]:
@@ -95,46 +109,47 @@ async def royalty_trs(royalty_address):
 
                             utimes.append(tr['utime'])
 
-    await client.close()
+    ### MODIFICA 3: NON chiudere il client qui! Verrà riutilizzato.
+    # RIMUOVI COMPLETAMENTE: await client.close()
 
     try:
         return utimes[-1]
     except:
-        pass
+        return None  # Ritorna None invece di pass
 
 
 async def scheduler():
-    print("=== [SCHEDULER] Scheduler started successfully ===")
+    print("=== [SCHEDULER] Started ===")
     cycle_count = 0
     
-    while True:
-        cycle_count += 1
-        print(f"\n=== [SCHEDULER] Starting cycle #{cycle_count} at {time.strftime('%H:%M:%S')} ===")
-        
-        try:
-            print(f"[SCHEDULER] Checking {len(royalty_addresses)} royalty addresses...")
-            # CHIAMATA ORIGINALE
+    try:
+        while True:
+            cycle_count += 1
+            print(f"\n[CYCLE #{cycle_count}] Start at {time.strftime('%H:%M:%S')}")
+            
             utimes = await asyncio.gather(*map(royalty_trs, royalty_addresses))
+            utimes = [u for u in utimes if u is not None]
             
-            print(f"[SCHEDULER] Results gathered: {utimes}")
-            utimes = list(filter(None, utimes))
+            if utimes:
+                last = max(utimes)
+                try:
+                    open(f'{current_path}/lastUtime', 'w').write(str(last))
+                    print(f"[CYCLE #{cycle_count}] Updated lastUtime: {last}")
+                except Exception as e:
+                    print(f"[CYCLE #{cycle_count}] Error saving lastUtime: {e}")
             
-            try:
-                if len(utimes) > 0:
-                    open(f'{current_path}/lastUtime', 'w').write(str(max(utimes)))
-                    print(f"[SCHEDULER] Updated lastUtime to {max(utimes)}")
-            except Exception as e:
-                print(f"[SCHEDULER] Error saving lastUtime: {e}")
-
-            print(f"[SCHEDULER] Cycle #{cycle_count} finished. Sleeping for 15 seconds...")
+            print(f"[CYCLE #{cycle_count}] Finished. Sleeping 15s...")
             await asyncio.sleep(15)
-
-        except Exception as e:
-            print(f"[SCHEDULER !!!] MAJOR ERROR in scheduler cycle: {type(e).__name__}: {e}")
-            print("[SCHEDULER !!!] Full Traceback:")
-            print(traceback.format_exc())
-            print("[SCHEDULER !!!] Restarting cycle in 30 seconds...")
-            await asyncio.sleep(30)
+            
+    except asyncio.CancelledError:
+        print("[SCHEDULER] Cancelled")
+    except Exception as e:
+        print(f"[SCHEDULER !!!] Fatal error: {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+    finally:
+        # Chiude il client globale quando lo scheduler termina
+        await close_global_client()
+        print("[SCHEDULER] Global client closed.")
 
 import atexit
 
@@ -151,4 +166,12 @@ atexit.register(cleanup_tonlib)
 
 if __name__ == '__main__':
     run_in_background()
-    asyncio.run(scheduler())
+    
+    try:
+        asyncio.run(scheduler())
+    except KeyboardInterrupt:
+        print("\n[MAIN] Bot stopped by user")
+    except Exception as e:
+        print(f"[MAIN] Bot crashed: {e}")
+        print(traceback.format_exc())
+        raise
