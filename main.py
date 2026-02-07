@@ -41,81 +41,94 @@ async def close_global_client():
 
 
 async def royalty_trs(royalty_address):
-    utimes = list()
-    last_utime = int(open(f'{current_path}/lastUtime', 'r').read())
-
-    ### MODIFICA 1: Usa get_global_client(), NON get_client()
-    client = await get_global_client()
-
-    # 1. INIZIALIZZA `trs` a None PRIMA del try
-    trs = None
-
+    """Controlla le transazioni per un indirizzo royalty. Usa il client globale."""
     try:
-        trs = await client.get_transactions(account=royalty_address,
-                                            limit=trs_limit)
-        print(f"[royalty_trs] Trovate {len(trs) if trs else 0} transazioni per {royalty_address[-6:]}")  # Log utile
-
-    except Exception as e:
-        print(f'Get Request for ({royalty_address}) address Failed! Check the logs\n{e}\n\n')
+        utimes = []
         
-        ### MODIFICA 2: NON chiudere il client qui! Solo return.
-        # RIMUOVI: await client.close()
-        return None  # <-- Ritorna None esplicitamente
-
-    if trs is not None:
-        for tr in trs[::-1]:
-            sc_address = tr['in_msg']['source']
-
-            if tr['utime'] <= last_utime or tr['in_msg']['source'] == '':
-                continue
-
-            for method in get_methods:
-
-                try:
-                    response = await client.raw_run_method(address=sc_address,
-                                                           method=method,
-                                                           stack_data=[])
-
-                except Exception as e:
-                    print(
-                        f'Error in raw run ({method}) method. Some problems with ({sc_address}) NFT sale contract. Check the logs:\n{e}')
-
-                if response is not None and response['exit_code'] == 0:
-                    sale_contract_data = parse_sale_stack(response['stack'])
-
-                    if sale_contract_data is not None and sale_contract_data[1]:
-                        sale_nft_data = await get_nft_data(client, sale_contract_data[4])
-
-                        if sale_nft_data is not None and sale_nft_data[1] in collections_list and sale_nft_data[0]:
-                            collection_floor_data = get_collection_floor(sale_nft_data[1])
-
-                            if sale_contract_data[0] == 'SaleFixPrice':
-                                tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
-                                           sale_contract_data[5], sale_nft_data[2], sale_contract_data[6],
-                                           sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
-                                           collection_floor_data[1])
-
-                            elif sale_contract_data[0] == 'SaleAuction':
-                                tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
-                                           sale_contract_data[5], sale_nft_data[2], sale_contract_data[11],
-                                           sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
-                                           collection_floor_data[1])
-
-                            elif sale_contract_data[0] == 'SaleOffer':
-                                tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
-                                           sale_contract_data[5], sale_nft_data[2], sale_contract_data[6],
-                                           sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
-                                           collection_floor_data[1])
-
-                            utimes.append(tr['utime'])
-
-    ### MODIFICA 3: NON chiudere il client qui! Verrà riutilizzato.
-    # RIMUOVI COMPLETAMENTE: await client.close()
-
-    try:
-        return utimes[-1]
-    except:
-        return None  # Ritorna None invece di pass
+        # 1. LEGGI lastUtime in modo ASINCRONO e SICURO
+        try:
+            # Usa aiofiles per I/O asincrono, ma per semplicità facciamo così:
+            with open(f'{current_path}/lastUtime', 'r') as f:
+                last_utime = int(f.read().strip())
+        except (FileNotFoundError, ValueError):
+            # Se il file non esiste o è vuoto, inizia da 0
+            last_utime = 0
+            print(f"[royalty_trs] File lastUtime non trovato o vuoto. Inizio da timestamp 0.")
+        
+        # 2. PRENDI IL CLIENT GLOBALE
+        client = await get_global_client()
+        
+        # 3. PRENDI LE TRANSAZIONI
+        trs = None
+        try:
+            trs = await client.get_transactions(account=royalty_address, limit=trs_limit)
+            print(f"[royalty_trs] Trovate {len(trs) if trs else 0} transazioni per {royalty_address[-6:]}")
+        except Exception as e:
+            print(f'[royalty_trs] Richiesta fallita per {royalty_address[-6:]}: {e}')
+            return None  # Esci senza errori
+        
+        # 4. PROCESSALE TRANSAZIONI
+        if trs is not None:
+            for tr in trs[::-1]:  # Processa dalla più vecchia alla più nuova
+                sc_address = tr['in_msg']['source']
+                
+                # Filtra transazioni vecchie o senza source
+                if tr['utime'] <= last_utime or not sc_address:
+                    continue
+                
+                # PROVA OGNI METODO
+                for method in get_methods:
+                    try:
+                        response = await client.raw_run_method(
+                            address=sc_address,
+                            method=method,
+                            stack_data=[]
+                        )
+                    except Exception as e:
+                        print(f'[royalty_trs] Errore metodo {method} su {sc_address[-6:]}: {e}')
+                        continue  # Prova il metodo successivo
+                    
+                    # SE IL METODO RESTITUISCE RISULTATO VALIDO
+                    if response and response['exit_code'] == 0:
+                        sale_contract_data = parse_sale_stack(response['stack'])
+                        
+                        if sale_contract_data and sale_contract_data[1]:  # sale_contract_data[1] = is_complete
+                            sale_nft_data = await get_nft_data(client, sale_contract_data[4])
+                            
+                            if (sale_nft_data and sale_nft_data[1] in collections_list and sale_nft_data[0]):
+                                collection_floor_data = get_collection_floor(sale_nft_data[1])
+                                
+                                # INVIA MESSAGGIO TELEGRAM IN BASE AL TIPO DI VENDITA
+                                if sale_contract_data[0] == 'SaleFixPrice':
+                                    tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
+                                              sale_contract_data[5], sale_nft_data[2], sale_contract_data[6],
+                                              sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
+                                              collection_floor_data[1])
+                                
+                                elif sale_contract_data[0] == 'SaleAuction':
+                                    tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
+                                              sale_contract_data[5], sale_nft_data[2], sale_contract_data[11],
+                                              sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
+                                              collection_floor_data[1])
+                                
+                                elif sale_contract_data[0] == 'SaleOffer':
+                                    tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
+                                              sale_contract_data[5], sale_nft_data[2], sale_contract_data[6],
+                                              sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
+                                              collection_floor_data[1])
+                                
+                                utimes.append(tr['utime'])
+                                break  # Esci dal loop dei metodi, abbiamo trovato una vendita
+        
+        # 5. RESTITUISCI L'ULTIMO TIMESTAMP (o None)
+        return utimes[-1] if utimes else None
+        
+    except Exception as e:
+        # CATTURA QUALSIASI ALTRO ERRORE IMPREVISTO
+        print(f"[royalty_trs CRITICAL] Errore imprevisto per {royalty_address[-6:]}: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return None
 
 
 async def scheduler():
