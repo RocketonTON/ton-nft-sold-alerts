@@ -1,36 +1,24 @@
-# Dipendenze principali TON
-pytonlib==0.0.70  # Usa l'ultima stabile, non 0.0.46
-ton==0.26
-tvm-valuetypes==0.0.9
+# Versione moderna e stabile di pytonlib
+pytonlib>=0.0.70
 
-# TON SDK - RIMUOVI la riga con @git e verifica se serve davvero
-# Se è indispensabile, Render potrebbe non supportarlo.
-tonsdk==1.0.15
-# Telegram
+# Tonsdk dalla release ufficiale su PyPI[citation:1]
+tonsdk
+
+# Dipendenze TON (potrebbero non essere necessarie, prova a toglierle se causano conflitto)
+# ton==0.26
+# tvm_valuetypes==0.0.9
+
+# Dipendenze principali
+aiohttp==3.8.4
+requests==2.28.2
 telepot==12.7
 
-# Supporto web/network
-requests==2.28.2
-aiohttp==3.8.4
-urllib3==1.26.15
-
-# Supporto crittografia/encoding
-PyNaCl==1.5.0
-cffi==1.15.1
-pycparser==2.21
+# Dipendenze di sistema (compatibili con le versioni sopra)
+attrs==23.1.0
 bitarray==2.6.0
+certifi>=2023.7.22
+cffi==1.15.1
 crc16==0.1.1
 crc32c==2.3.post0
-charset-normalizer==3.1.0
-idna==3.4
-
-# Dipendenze di aiohttp (dovrebbero auto-installarsi, ma meglio specificare)
-aiosignal==1.3.1
-async-timeout==4.0.2
-attrs==23.1.0
-frozenlist==1.3.3
-multidict==6.0.4
-yarl==1.9.2
-
-# Certificati SSL
-certifi==2023.7.22  # Aggiornato all'ultima stabile
+PyNaCl==1.5.0
+urllib3==1.26.15
