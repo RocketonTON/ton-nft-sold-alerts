@@ -8,12 +8,9 @@ current_path = pathlib.Path(__file__).parent.resolve()
 
 trs_limit = 50
 
-royalty_addresses = [#'EQAA4W2tr6JdJsyej6Ix5tckcwsiRwWmLuI67Tznj1JlaP4X',  # Toned Ape Club!
-                     #'EQCgRvXbOJeFSRKnEg1D-i0SqDMlaNVGvpSSKCzDQU_wDAR4',  # Tonex
-                     ]
+royalty_addresses = ['EQBo86B200UaGP1B4FxxtMAgVF1GsnVwZOZYJd7QxJvwLHL0']
 
-collections_list = [#'EQCzuSjkgUND61l7gIH3NvVWNtZ0RX1hxz1rWnmJqGPmZh7S',  # Toned Ape Club!
-                    ]
+collections_list = ['EQA4i58iuS9DUYRtUZ97sZo5mnkbiYUBpWXQOe3dEUCcP1W8']
 
 ton_config_url = 'https://ton.org/global-config.json'
 tonorg_price_url = 'https://ton.org/getpriceg/'
