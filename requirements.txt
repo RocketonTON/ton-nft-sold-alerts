@@ -21,3 +21,6 @@ tonsdk @ git+https://github.com/devdaoteam/tonsdk.git@cf24c001bc3b0c101a3f1aaa91
 tvm-valuetypes==0.0.9
 urllib3==1.26.15
 yarl==1.9.2
+pytonlib==0.56.2
+requests==2.28.1
+Flask==2.2.2
