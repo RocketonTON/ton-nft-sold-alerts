@@ -32,12 +32,19 @@ async def royalty_trs(royalty_address):
 
     client = await get_client()
 
+    # 1. INIZIALIZZA `trs` a None PRIMA del try
+    trs = None
+
     try:
         trs = await client.get_transactions(account=royalty_address,
                                             limit=trs_limit)
 
     except Exception as e:
         print(f'Get Request for ({royalty_address}) address Failed! Check the logs\n{e}\n\n')
+        
+        # DOPO aver stampato l'errore, ESCI dalla funzione
+        await client.close()
+        return  # <-- AGGIUNGI QUESTA RIGA! Esce senza restituire utimes.
 
     if trs is not None:
         for tr in trs[::-1]:
