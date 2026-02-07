@@ -15,6 +15,10 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
         self.wfile.write(b"OK - TON NFT Bot Alive")
+
+    def run_in_background():
+    thread = threading.Thread(target=start_health_server, daemon=True)
+    thread.start()
     
     def log_message(self, *args):
         pass
