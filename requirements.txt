@@ -1,5 +1,5 @@
 # PACCHETTI CORE DEL BOT ORIGINALE
-pytonlib==0.0.46
+pytonlib==0.0.70
 ton==0.26
 tonsdk @ git+https://github.com/devdaoteam/tonsdk.git@cf24c001bc3b0c101a3f1aaa91a01659a2849e56
 telepot==12.7
