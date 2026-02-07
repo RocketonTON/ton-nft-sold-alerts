@@ -5,8 +5,8 @@ pytonlib>=0.0.70
 tonsdk
 
 # Dipendenze TON (potrebbero non essere necessarie, prova a toglierle se causano conflitto)
-# ton==0.26
-# tvm_valuetypes==0.0.9
+ton==0.26
+tvm_valuetypes==0.0.9
 
 # Dipendenze principali
 aiohttp==3.8.4
