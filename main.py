@@ -106,6 +106,18 @@ async def scheduler():
 
         await asyncio.sleep(15)
 
+import atexit
+
+def cleanup_tonlib():
+    """Tenta di pulire le risorse di pytonlib all'uscita."""
+    try:
+        # Qui si potrebbe fare una pulizia esplicita se il client fosse globale
+        pass
+    except Exception:
+        pass
+
+# Registra la funzione di cleanup
+atexit.register(cleanup_tonlib)
 
 if __name__ == '__main__':
     run_in_background()
