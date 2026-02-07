@@ -1,3 +1,5 @@
+import time
+import traceback
 import requests
 import asyncio
 
@@ -102,16 +104,37 @@ async def royalty_trs(royalty_address):
 
 
 async def scheduler():
+    print("=== [SCHEDULER] Scheduler started successfully ===")
+    cycle_count = 0
+    
     while True:
-        utimes = await asyncio.gather(*map(royalty_trs, royalty_addresses))
-        utimes = list(filter(None, utimes))
+        cycle_count += 1
+        print(f"\n=== [SCHEDULER] Starting cycle #{cycle_count} at {time.strftime('%H:%M:%S')} ===")
+        
         try:
-            if len(utimes) > 0:
-                open(f'{current_path}/lastUtime', 'w').write(str(max(utimes)))
-        except:
-            pass
+            print(f"[SCHEDULER] Checking {len(royalty_addresses)} royalty addresses...")
+            # CHIAMATA ORIGINALE
+            utimes = await asyncio.gather(*map(royalty_trs, royalty_addresses))
+            
+            print(f"[SCHEDULER] Results gathered: {utimes}")
+            utimes = list(filter(None, utimes))
+            
+            try:
+                if len(utimes) > 0:
+                    open(f'{current_path}/lastUtime', 'w').write(str(max(utimes)))
+                    print(f"[SCHEDULER] Updated lastUtime to {max(utimes)}")
+            except Exception as e:
+                print(f"[SCHEDULER] Error saving lastUtime: {e}")
 
-        await asyncio.sleep(15)
+            print(f"[SCHEDULER] Cycle #{cycle_count} finished. Sleeping for 15 seconds...")
+            await asyncio.sleep(15)
+
+        except Exception as e:
+            print(f"[SCHEDULER !!!] MAJOR ERROR in scheduler cycle: {type(e).__name__}: {e}")
+            print("[SCHEDULER !!!] Full Traceback:")
+            print(traceback.format_exc())
+            print("[SCHEDULER !!!] Restarting cycle in 30 seconds...")
+            await asyncio.sleep(30)
 
 import atexit
 
