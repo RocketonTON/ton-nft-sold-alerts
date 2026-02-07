@@ -23,4 +23,6 @@ urllib3==1.26.15
 yarl==1.9.2
 pytonlib==0.56.2
 requests==2.28.1
-Flask==2.2.2
+aiohttp==3.8.4
+aiogram==2.25.1
+asyncio==3.4.3
