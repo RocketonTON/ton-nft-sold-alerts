@@ -1,6 +1,7 @@
 import requests
 import asyncio
 
+from web_server import run_in_background
 from pathlib import Path
 from pytonlib import TonlibClient
 
@@ -107,4 +108,5 @@ async def scheduler():
 
 
 if __name__ == '__main__':
+    run_in_background()
     asyncio.run(scheduler())
