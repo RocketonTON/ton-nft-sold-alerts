@@ -12,7 +12,7 @@ royalty_addresses = ['EQBo86B200UaGP1B4FxxtMAgVF1GsnVwZOZYJd7QxJvwLHL0']
 
 collections_list = ['EQA4i58iuS9DUYRtUZ97sZo5mnkbiYUBpWXQOe3dEUCcP1W8']
 
-ton_config_url = 'https://ton.org/global-config.json'
+ton_config_url = 'https://ton.org/global.config.json'
 tonorg_price_url = 'https://ton.org/getpriceg/'
 tonapi_url = 'https://tonapi.io/v1/'
 getgems_api_url = 'https://api.getgems.io/graphql'
