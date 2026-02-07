@@ -5,7 +5,7 @@ tvm-valuetypes==0.0.9
 
 # TON SDK - RIMUOVI la riga con @git e verifica se serve davvero
 # Se è indispensabile, Render potrebbe non supportarlo.
-# tonsdk
+tonsdk
 # Telegram
 telepot==12.7
 
