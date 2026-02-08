@@ -192,10 +192,13 @@ async def royalty_trs(royalty_address):
 
             # === DEBUG SECTION 2 ===
             debug_msg = f"[DEBUG TX] utime={tx_time}, is_new={tx_time > last_utime}"
-            if tx_time > last_utime:
-                debug_msg += f" ✓ NEW (source: {source[-6:] if source else 'no source'})"
+            # Calcola source qui solo per debug
+            temp_source = tx.get("in_msg", {}).get("source", {}).get("address") if tx_time > last_utime else None
+            if tx_time > last_utime and temp_source:
+                debug_msg += f" ✓ NEW (source: {temp_source[-6:]})"
             print(debug_msg, flush=True)
             
+        
         
             if tx_time <= last_utime:
                 continue
