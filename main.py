@@ -403,12 +403,13 @@ async def scheduler():
                     except Exception as e:
                         print(f"[CYCLE #{cycle_count}] ❌ Error saving lastUtime: {e}", flush=True)
                 
-                print(f"[CYCLE #{cycle_count}] Finished. Sleeping 15s...", flush=True)
+                print(f"[CYCLE #{cycle_count}] Finished. Sleeping 180s (3min)...", flush=True)
                 
                 # Sleep with heartbeat
-                for i in range(3):
-                    await asyncio.sleep(5)
-                    print(f"[HEARTBEAT] Alive... ({(i+1)*5}s)", flush=True)
+                for i in range(6):
+                    await asyncio.sleep(30)
+                    minutes = (i + 1) * 0.5  # 0.5, 1.0, 1.5, 2.0, 2.5, 3.0 min
+                    print(f"[HEARTBEAT] {minutes}min / 3min", flush=True)
                     
             except Exception as cycle_error:
                 print(f"[CYCLE #{cycle_count}] ❌ Error in cycle: {cycle_error}", flush=True)
