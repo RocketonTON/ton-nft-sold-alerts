@@ -13,7 +13,7 @@ from functions import convert_ton_to_usd
 # === CONFIGURAZIONE TONAPI ===
 TONAPI_BASE = "https://tonapi.io/v2"
 TONAPI_HEADERS = {
-    "Authorization": "Bearer AFNCCHEA2GXEAVQAAAAG6IP6JUAO5ZJORI5UJQFEV6OZVSP6XGSLRGQAGTFMTKGLWXD7AAI"  # Token pubblico
+    "Authorization": "Bearer AFH3J5APTYFZD6QAAAAFQRGBZFOIO26SOOJ5N2LD5YGJGDOBMFBDKA3HNZ72ZNUTFHSFRJI"  # Token pubblico
 }
 
 def get_transactions_http(address, limit=50):
