@@ -249,7 +249,7 @@ async def scheduler():
                     print(f"[CYCLE #{cycle_count}] ❌ Error saving lastUtime: {e}")
             
             print(f"[CYCLE #{cycle_count}] Finished. Sleeping 15s...")
-            await asyncio.sleep(15)
+            await asyncio.sleep(9)
     
     except KeyboardInterrupt:
         print("\n[SCHEDULER] Stopped by user")
