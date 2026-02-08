@@ -174,11 +174,29 @@ async def royalty_trs(royalty_address):
             return None
         
         print(f"[royalty_trs] Found {len(transactions)} transactions for {royalty_address[-6:]}", flush=True)
+
+        # === DEBUG SECTION 1 ===
+        print(f"[DEBUG] last_utime from file: {last_utime}")
+        print(f"[DEBUG] First transaction utime: {transactions[0]['utime'] if transactions else 'N/A'}")
+        print(f"[DEBUG] Last transaction utime: {transactions[-1]['utime'] if transactions else 'N/A'}")
+        
+        new_count = 0
+        for tx in reversed(transactions):
+            if tx.get("utime", 0) > last_utime:
+                new_count += 1
+        print(f"[DEBUG] Transactions with utime > last_utime: {new_count}/{len(transactions)}")
         
         # 3. PROCESSA TRANSAZIONI
         for tx in reversed(transactions):
             tx_time = tx.get("utime", 0)
+
+            # === DEBUG SECTION 2 ===
+            debug_msg = f"[DEBUG TX] utime={tx_time}, is_new={tx_time > last_utime}"
+            if tx_time > last_utime:
+                debug_msg += f" ✓ NEW (source: {source[-6:] if source else 'no source'})"
+            print(debug_msg, flush=True)
             
+        
             if tx_time <= last_utime:
                 continue
             
@@ -238,6 +256,11 @@ async def royalty_trs(royalty_address):
                 
                 utimes.append(tx_time)
                 break
+
+        # === DEBUG SECTION 3 ===
+        print(f"[DEBUG] Total new transactions processed: {len(utimes)}")
+        print(f"[DEBUG] Highest utime found: {max(utimes) if utimes else 'None'}")
+        
         
         return utimes[-1] if utimes else None
     
