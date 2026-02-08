@@ -58,32 +58,29 @@ def run_get_method_http(address, method):
 
 
 def parse_tonapi_stack(stack):
-    """
-    Converte lo stack di TonAPI nel formato atteso.
-    
-    TonAPI restituisce: [{"type": "num", "num": "123"}, ...]
-    Necessario: [["num", "0x7b"], ...]
-    """
     converted = []
-    
     for item in stack:
-        item_type = item.get("type")
+        # 1. Gestione PRINCIPALE del campo 'num'
+        if isinstance(item, dict) and 'num' in item:
+            num_str = item.get("num")
+            try:
+                if isinstance(num_str, str) and num_str.startswith("0x"):
+                    num_val = int(num_str, 16)  # Converti esadecimale
+                else:
+                    num_val = int(num_str)      # Converti decimale normale
+                # Ricostruisci l'oggetto con il valore convertito
+                converted.append(["num", str(num_val)])
+            except (ValueError, TypeError):
+                # 2. Se la conversione fallisce, usa il fallback ESISTENTE
+                converted.append(["unknown", str(item)])
         
-        if item_type == "num":
-            # Converti decimal string in hex
-            num_val = int(item.get("num", "0"))
-            converted.append(["num", hex(num_val)])
+        # 3. Gestione degli altri tipi (cell, slice, ecc.) - Mantieni la tua logica attuale
+        elif isinstance(item, dict) and 'cell' in item:
+            converted.append(["cell", item["cell"]])
+        elif isinstance(item, dict) and 'slice' in item:
+            converted.append(["slice", item["slice"]])
         
-        elif item_type == "cell":
-            # Cell in formato base64
-            cell_bytes = item.get("cell", "")
-            converted.append(["tvm.Cell", {"bytes": cell_bytes}])
-        
-        elif item_type == "slice":
-            # Slice - convertiamo in cell
-            cell_bytes = item.get("cell", "")
-            converted.append(["tvm.Cell", {"bytes": cell_bytes}])
-        
+        # 4. Fallback finale per dati completamente sconosciuti
         else:
             converted.append(["unknown", str(item)])
     
