@@ -27,7 +27,7 @@ async def get_global_client():
         _ton_client = TonlibClient(ls_index=2,
                                    config=config,
                                    keystore=keystore_dir,
-                                   timeout=60,  # Aumentato a 60 secondi
+                                   timeout=60)  # Aumentato a 60 secondi
         await _ton_client.init()
         print("[INIT] Global TonLibClient created successfully.")
     return _ton_client
