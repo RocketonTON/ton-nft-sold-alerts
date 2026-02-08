@@ -1,4 +1,4 @@
-# VERSIONE SEMPLIFICATA - Solo HTTP requests, nessun lite client!
+# requirements.txt
 
 # Bot Telegram
 telepot==12.7
@@ -6,10 +6,8 @@ telepot==12.7
 # HTTP requests
 requests==2.31.0
 
-# Dipendenze minime per parsing
+# Dipendenze minime
 PyNaCl==1.5.0
 bitarray==2.8.0
 
-# OPZIONALE: Se vuoi usare anche pytoniq come fallback
-# pytoniq==0.1.40
-# pytoniq-core==0.1.36
+# NOTA: pytoniq NON è necessario per TonAPI
