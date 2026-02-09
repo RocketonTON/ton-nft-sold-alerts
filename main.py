@@ -27,14 +27,34 @@ async def get_client():
 
 async def royalty_trs(royalty_address):
     utimes = list()
-    last_utime = int(open(f'{current_path}/lastUtime', 'r').read())
-
+    
+    # === MODIFICA PER CREARE FILE AL PRIMO AVVIO ===
+    LAST_UTIME_PATH = '/tmp/lastUtime.txt'
+    
+    # 1. PROVA A LEGGERE
+    try:
+        with open(LAST_UTIME_PATH, 'r') as f:
+            last_utime = int(f.read().strip())
+    except FileNotFoundError:
+        # 2. SE NON ESISTE, CREALO CON VALORE 0
+        print(f"[royalty_trs] Creating new lastUtime file at {LAST_UTIME_PATH}", flush=True)
+        last_utime = 0
+        with open(LAST_UTIME_PATH, 'w') as f:
+            f.write('0')  # Crea file con valore iniziale 0
+    except ValueError:
+        # 3. SE IL FILE ESISTE MA CONTIENE GARBAGE
+        print(f"[royalty_trs] Invalid content in lastUtime file, resetting to 0", flush=True)
+        last_utime = 0
+        with open(LAST_UTIME_PATH, 'w') as f:
+            f.write('0')
+    
+    print(f"[royalty_trs] Starting with last_utime: {last_utime}", flush=True)
+    
     client = await get_client()
-
+    
     try:
         trs = await client.get_transactions(account=royalty_address,
                                             limit=trs_limit)
-
     except Exception as e:
         print(f'Get Request for ({royalty_address}) address Failed! Check the logs\n{e}\n\n')
 
@@ -99,9 +119,16 @@ async def scheduler():
         utimes = list(filter(None, utimes))
         try:
             if len(utimes) > 0:
-                open(f'{current_path}/lastUtime', 'w').write(str(max(utimes)))
-        except:
-            pass
+                # === MODIFICA QUESTA LINEA ===
+                # DA:
+                # open(f'{current_path}/lastUtime', 'w').write(str(max(utimes)))
+                
+                # A:
+                with open('/tmp/lastUtime.txt', 'w') as f:
+                    f.write(str(max(utimes)))
+                print(f"[scheduler] ✅ Updated lastUtime to: {max(utimes)}", flush=True)
+        except Exception as e:
+            print(f"[scheduler] ❌ Error saving lastUtime: {e}", flush=True)
 
         await asyncio.sleep(15)
 
