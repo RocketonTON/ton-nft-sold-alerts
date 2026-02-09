@@ -86,7 +86,7 @@ class TonCenterAPI:
                 params = {
                     "address": address,
                     "limit": limit,
-                    "archival": True
+                    "archival": true
                 }
                 
                 async with session.get(url, headers=self.headers, 
@@ -118,7 +118,7 @@ class TonCenterAPI:
                 payload = {
                     "address": address,
                     "method": method,
-                    "stack": stack or []
+                    "stack": stack if stack is not None else []
                 }
                 
                 async with session.post(url, headers=self.headers, 
