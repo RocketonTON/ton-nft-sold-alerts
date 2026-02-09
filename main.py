@@ -74,10 +74,15 @@ HTTP_TIMEOUT = aiohttp.ClientTimeout(total=20)
 class TonCenterAPI:
     
     def __init__(self):
-        self.base_url = TONCENTER_API_V3
+        # PROVA CON API v2 (più stabile)
+        self.base_url = "https://toncenter.com/api/v2"  # ← CAMBIA A v2
+        # self.base_url = TONCENTER_API_V3  # ← COMMENTA QUESTA
+        
         self.headers = TONCENTER_HEADERS
         self.timeout = HTTP_TIMEOUT
         self.min_request_interval = TONCENTER_RATE_LIMIT
+        
+        print(f"[DEBUG] Using API: {self.base_url}")
     
     async def get_transactions(self, address: str, limit: int = 10) -> list:
         """Test both archival formats"""
