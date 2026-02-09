@@ -11,7 +11,7 @@ TONCENTER_RATE_LIMIT = 1  # secondi tra le richieste
 
 
 # === BOT CONFIGURATION ===
-trs_limit = 50
+trs_limit = 25
 
 # Royalty addresses to monitor
 royalty_addresses = ['EQBo86B200UaGP1B4FxxtMAgVF1GsnVwZOZYJd7QxJvwLHL0']
