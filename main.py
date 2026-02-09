@@ -85,59 +85,59 @@ class TonCenterAPI:
         print(f"[DEBUG] Using API: {self.base_url}")
     
     async def get_transactions(self, address: str, limit: int = 10) -> list:
-    """Fetch transactions - test multiple approaches"""
-    
-    # Testa diverse combinazioni di parametri
-    test_cases = [
-        {"archival": "true"},   # 1. Con archival
-        {},                     # 2. Senza archival (più transazioni)
-        {"archival": "false"},  # 3. Solo non-archival
-    ]
-    
-    for params_test in test_cases:
-        try:
-            print(f"[DEBUG] Testing params: {params_test}")
-            
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                # Parametri base
-                base_params = {
-                    "address": address,
-                    "limit": limit,
-                }
-                # Combina con test case
-                params = {**base_params, **params_test}
-                
-                url = f"{self.base_url}/getTransactions"
-                
-                async with session.get(url, headers=self.headers, params=params) as response:
-                    
-                    print(f"[DEBUG] Status: {response.status}")
-                    
-                    if response.status == 200:
-                        data = await response.json()
-                        txs = data.get("transactions", [])
-                        print(f"[TON Center] ✅ Got {len(txs)} transactions with params: {params_test}")
-                        
-                        if txs:
-                            # Mostra qualche info sulle transazioni
-                            for i, tx in enumerate(txs[:3]):  # Prime 3 transazioni
-                                print(f"  TX {i}: utime={tx.get('utime')}, hash={tx.get('hash', '')[:10]}...")
-                            return txs
-                        else:
-                            print(f"[TON Center] ⚠️ 0 transactions with params: {params_test}")
-                            continue  # Prova combinazione successiva
-                    
-                    else:
-                        error_text = await response.text()
-                        print(f"[DEBUG] Failed: {error_text[:100]}")
-                        continue
+        """Fetch transactions - test multiple approaches"""
         
-        except Exception as e:
-            print(f"[DEBUG] Error: {e}")
-            continue
-    
-    print(f"[TON Center] ❌ No transactions found with any parameters")
-    return []
+        # Testa diverse combinazioni di parametri
+        test_cases = [
+            {"archival": "true"},   # 1. Con archival
+            {},                     # 2. Senza archival (più transazioni)
+            {"archival": "false"},  # 3. Solo non-archival
+        ]
+        
+        for params_test in test_cases:
+            try:
+                print(f"[DEBUG] Testing params: {params_test}")
+                
+                async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                    # Parametri base
+                    base_params = {
+                        "address": address,
+                        "limit": limit,
+                    }
+                    # Combina con test case
+                    params = {**base_params, **params_test}
+                    
+                    url = f"{self.base_url}/getTransactions"
+                    
+                    async with session.get(url, headers=self.headers, params=params) as response:
+                        
+                        print(f"[DEBUG] Status: {response.status}")
+                        
+                        if response.status == 200:
+                            data = await response.json()
+                            txs = data.get("transactions", [])
+                            print(f"[TON Center] ✅ Got {len(txs)} transactions with params: {params_test}")
+                            
+                            if txs:
+                                # Mostra qualche info sulle transazioni
+                                for i, tx in enumerate(txs[:3]):  # Prime 3 transazioni
+                                    print(f"  TX {i}: utime={tx.get('utime')}, hash={tx.get('hash', '')[:10]}...")
+                                return txs
+                            else:
+                                print(f"[TON Center] ⚠️ 0 transactions with params: {params_test}")
+                                continue  # Prova combinazione successiva
+                        
+                        else:
+                            error_text = await response.text()
+                            print(f"[DEBUG] Failed: {error_text[:100]}")
+                            continue
+            
+            except Exception as e:
+                print(f"[DEBUG] Error: {e}")
+                continue
+        
+        print(f"[TON Center] ❌ No transactions found with any parameters")
+        return []
     
     async def run_get_method(self, address: str, method: str, stack: list = None) -> list:
         """Execute a get method on a smart contract"""
