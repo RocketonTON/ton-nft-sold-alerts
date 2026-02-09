@@ -673,7 +673,6 @@ async def test_direct_api_call(address: str):
         print(f"[DIRECT TEST] Exception: {e}")
         traceback.print_exc()
 
-
 async def scheduler():
     """Main bot loop - UPDATED LOG MESSAGES"""
     print("\n" + "=" * 60, flush=True)
