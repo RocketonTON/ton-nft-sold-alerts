@@ -80,14 +80,14 @@ class TonCenterAPI:
         self.min_request_interval = TONCENTER_RATE_LIMIT
     
     async def get_transactions(self, address: str, limit: int = 10) -> list:
-        """Fetch transactions for an address"""
-        try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                url = f"{self.base_url}/getTransactions"
-                params = {
-                    "address": address,
-                    "limit": limit
-                }
+    """Fetch transactions for an address"""
+    try:
+        async with aiohttp.ClientSession(timeout=self.timeout) as session:
+            url = f"{self.base_url}/getTransactions"
+            params = {
+                "address": address,
+                "limit": limit,
+                "archival": True
                 
                 async with session.get(url, headers=self.headers, 
                                      params=params) as response:
