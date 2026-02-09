@@ -50,11 +50,16 @@ sys.modules['crc16'] = CRC16Shim()
 # FUNZIONI TON
 # ============================================
 async def get_client():
-    config = requests.get(ton_config_url).json()
+    config = requests.get(ton_config_url, timeout=10).json()
     keystore_dir = '/tmp/ton_keystore'
     Path(keystore_dir).mkdir(parents=True, exist_ok=True)
 
-    client = TonlibClient(ls_index=2, config=config, keystore=keystore_dir, tonlib_timeout=10)
+    client = TonlibClient(
+        ls_index=3,  # Potresti cambiare anche questo, prova 0, 1, 3...
+        config=config,
+        keystore=keystore_dir,
+        tonlib_timeout=30,  # <-- AUMENTA da 10 a 30 secondi
+    )
     await client.init()
     return client
 
