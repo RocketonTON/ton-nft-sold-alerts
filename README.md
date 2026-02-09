@@ -74,7 +74,7 @@ Set these in Render Dashboard → Environment:
 ### Build & Start Commands
 
 - **Build Command:** `pip install -r requirements.txt`
-- **Start Command:** `python main.py`
+- **Start Command:** `python web_server.py`
 
 ### Health Check
 
@@ -180,7 +180,7 @@ echo $TONAPI_TOKEN
 
 The bot has built-in timeout handling:
 - Transaction fetch: 20s
-- NFT data fetch: 15s
+- NFT data fetch: 180s
 - Collection floor: 15s
 - Telegram send: 10s
 
@@ -196,10 +196,8 @@ The bot provides detailed logging:
 [royalty_trs] Found 15 transactions
 [royalty_trs] ✅ Sale processed successfully
 [CYCLE #1] ✅ Updated lastUtime: 1738234567
-[CYCLE #1] Sleeping 15s...
-[HEARTBEAT] 5s
-[HEARTBEAT] 10s
-[HEARTBEAT] 15s
+[CYCLE #1] Sleeping 180s...
+[HEARTBEAT] 3min
 ```
 
 ## 🔐 Security
@@ -220,7 +218,7 @@ The bot provides detailed logging:
 
 ## 📈 Performance
 
-- **Cycle Time:** 15 seconds
+- **Cycle Time:** 180 seconds
 - **Concurrent Requests:** Yes (async)
 - **Timeout Protection:** All HTTP calls
 - **Auto-Recovery:** Yes
