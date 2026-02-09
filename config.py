@@ -1,9 +1,23 @@
-import telepot
 import pathlib
-
+import os
+from telegram.ext import Application
 from secretData import *
 
-bot = telepot.Bot(bot_token)
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+
+# === INIZIALIZZAZIONE DEL BOT TELEGRAM (NUOVA) ===
+# Controlla se il token è configurato, altrimenti imposta application a None per evitare errori
+if TELEGRAM_BOT_TOKEN:
+    try:
+        application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+        print("[CONFIG] ✅ Telegram Bot Application inizializzata")
+    except Exception as e:
+        print(f"[CONFIG] ❌ Errore nell'inizializzazione del Bot: {e}")
+        application = None
+else:
+    print("[CONFIG] ⚠️ Token del Bot Telegram non configurato (TELEGRAM_BOT_TOKEN)")
+    application = None
+
 current_path = pathlib.Path(__file__).parent.resolve()
 
 trs_limit = 50
