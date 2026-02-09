@@ -1,4 +1,3 @@
-import telepot
 import os
 import pathlib
 
