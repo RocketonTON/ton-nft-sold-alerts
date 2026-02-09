@@ -71,6 +71,31 @@ if toncenter_api_key:
 
 HTTP_TIMEOUT = aiohttp.ClientTimeout(total=20)
 
+# Helper function to safely access transaction data
+def safe_tx_get(tx, key, default=None):
+    """
+    Safely get a value from transaction, handling multiple data types
+    """
+    if isinstance(tx, dict):
+        return tx.get(key, default)
+    elif isinstance(tx, list) and len(tx) > 0:
+        # If tx is a list, maybe it's a simple array of values
+        try:
+            # Try to convert key to index
+            idx = int(key) if isinstance(key, str) and key.isdigit() else key
+            if isinstance(idx, int) and 0 <= idx < len(tx):
+                return tx[idx]
+        except:
+            pass
+        return default
+    elif isinstance(tx, str):
+        # If transaction is a string, log it and return default
+        print(f"[WARN] Transaction is a string, not a dict: {tx[:50]}...")
+        return default
+    else:
+        print(f"[WARN] Unknown transaction type: {type(tx)}")
+        return default
+
 class TonCenterAPI:
     
     def __init__(self):
@@ -418,24 +443,40 @@ async def royalty_trs(royalty_address: str):
         
         print(f"[royalty_trs] Found {len(transactions)} transactions for {royalty_address[-8:]}", flush=True)
         
-        # MODIFICA: La v3 usa "now" invece di "utime"
+        # MODIFICA: Usa safe_tx_get invece di .get() diretto
         print(f"[DEBUG] First 3 transactions sample (API v3 format):")
         for i, tx in enumerate(transactions[:3]):
-            tx_time = tx.get("now", 0)  # ✅ "now" in v3
-            tx_hash = tx.get("hash", "")[:10] + "..." if tx.get("hash") else "no-hash"
-            tx_lt = tx.get("lt", "N/A")
+            # ✅ USA safe_tx_get invece di tx.get()
+            tx_time = safe_tx_get(tx, "now", 0)
+            tx_hash = safe_tx_get(tx, "hash", "")
+            tx_lt = safe_tx_get(tx, "lt", "N/A")
             
             print(f"  TX{i}: now={tx_time} ({time.ctime(tx_time) if tx_time > 0 else 'N/A'})")
-            print(f"       hash: {tx_hash}, lt: {tx_lt}")
+            print(f"       hash: {tx_hash[:10] + '...' if tx_hash else 'no-hash'}, lt: {tx_lt}")
             
-            if tx.get("in_msg"):
-                source = tx["in_msg"].get("source", {}).get("address", "no-source")
-                value = int(tx["in_msg"].get("value", 0)) / 1e9  # Converti nanoTON a TON
-                print(f"       source: {source[-8:] if source else 'no-source'}, value: {value:.2f} TON")
+            # ✅ USA safe_tx_get anche per struttura nidificata
+            in_msg = safe_tx_get(tx, "in_msg", {})
+            if in_msg:
+                source = safe_tx_get(in_msg, "source", {})
+                if isinstance(source, dict):
+                    source_addr = safe_tx_get(source, "address", "no-source")
+                    value = int(safe_tx_get(in_msg, "value", 0)) / 1e9
+                    print(f"       source: {source_addr[-8:] if source_addr else 'no-source'}, value: {value:.2f} TON")
         
-        # STATISTICHE AGGIORNATE PER V3
+        # STATISTICHE AGGIORNATE PER V3 (usa safe_tx_get)
+        # Prima verifica che tutte le transazioni siano dict
+        valid_txs = [tx for tx in transactions if isinstance(tx, dict)]
+        invalid_txs = [tx for tx in transactions if not isinstance(tx, dict)]
+        
+        if invalid_txs:
+            print(f"[WARN] Found {len(invalid_txs)} invalid transactions (not dicts):")
+            for i, tx in enumerate(invalid_txs[:3]):
+                print(f"  Invalid TX {i}: type={type(tx)}, value={str(tx)[:50]}")
+        
         stats = {
             "total": len(transactions),
+            "valid_dicts": len(valid_txs),
+            "invalid_types": len(invalid_txs),
             "already_processed": 0,      # tx_time <= last_utime
             "new_transactions": 0,       # tx_time > last_utime
             "new_no_source": 0,          # nuove ma senza source address
@@ -444,17 +485,17 @@ async def royalty_trs(royalty_address: str):
             "new_nft_sales": 0,          # nuove vendite NFT valide
             "new_monitored": 0,          # nuove in collezioni monitorate
             "time_range": {
-                "min": min(tx.get("now", 0) for tx in transactions) if transactions else 0,
-                "max": max(tx.get("now", 0) for tx in transactions) if transactions else 0,
+                "min": min(safe_tx_get(tx, "now", 0) for tx in valid_txs) if valid_txs else 0,
+                "max": max(safe_tx_get(tx, "now", 0) for tx in valid_txs) if valid_txs else 0,
             }
         }
         
         latest_utime = last_utime
         processed_count = 0
         
-        # 3. PROCESS TRANSACTIONS (con timestamp "now" invece di "utime")
-        for tx in transactions:
-            tx_time = tx.get("now", 0)  # ✅ Usa "now" invece di "utime"
+        # 3. PROCESS TRANSACTIONS - SOLO QUELLE VALIDE (dict)
+        for tx in valid_txs:
+            tx_time = safe_tx_get(tx, "now", 0)
             
             # FILTRO 1: TIMESTAMP
             if tx_time <= last_utime:
@@ -467,23 +508,24 @@ async def royalty_trs(royalty_address: str):
             if tx_time > latest_utime:
                 latest_utime = tx_time
             
-            in_msg = tx.get("in_msg", {})
-            source = in_msg.get("source", {}).get("address")
+            in_msg = safe_tx_get(tx, "in_msg", {})
+            source = safe_tx_get(in_msg, "source", {})
+            source_address = safe_tx_get(source, "address") if isinstance(source, dict) else None
             
             # FILTRO 2: SOURCE ADDRESS
-            if not source:
+            if not source_address:
                 stats["new_no_source"] += 1
                 print(f"[DEBUG] ⚠️ New transaction {tx_time} has NO source address", flush=True)
                 continue
             
-            print(f"[royalty_trs] Processing transaction from {source[-8:]} (time: {tx_time})", flush=True)
+            print(f"[royalty_trs] Processing transaction from {source_address[-8:]} (time: {tx_time})", flush=True)
             
             # FILTRO 3: È UNA VENDITA NFT?
-            stack, method_used = await toncenter_api.get_sale_data_with_retry(source)
+            stack, method_used = await toncenter_api.get_sale_data_with_retry(source_address)
             
             if not stack:
                 stats["new_not_sale"] += 1
-                print(f"[royalty_trs] ❌ No sale data found for {source[-8:]} (not NFT sale)", flush=True)
+                print(f"[royalty_trs] ❌ No sale data found for {source_address[-8:]} (not NFT sale)", flush=True)
                 continue
             
             print(f"[royalty_trs] ✅ Success with {method_used}! Stack has {len(stack)} items", flush=True)
@@ -566,6 +608,8 @@ async def royalty_trs(royalty_address: str):
         # REPORT STATISTICHE FINALE
         print(f"\n[STATS] ======= TRANSACTION ANALYSIS (API v3) =======")
         print(f"[STATS] Total transactions from API: {stats['total']}")
+        print(f"[STATS] Valid dict transactions: {stats['valid_dicts']}")
+        print(f"[STATS] Invalid (non-dict) transactions: {stats['invalid_types']}")
         print(f"[STATS] Time range: {stats['time_range']['min']} → {stats['time_range']['max']}")
         print(f"[STATS] Already processed (time filter): {stats['already_processed']}")
         print(f"[STATS] New transactions found: {stats['new_transactions']}")
