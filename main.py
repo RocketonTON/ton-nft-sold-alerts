@@ -224,16 +224,57 @@ async def royalty_trs(royalty_address: str):
     try:
         # 1. READ lastUtime
         last_utime = read_last_utime()
+        print(f"[DEBUG] Last utime from file: {last_utime} ({time.ctime(last_utime) if last_utime > 0 else 'epoch'})")
         
         # 2. FETCH TRANSACTIONS
-        print(f"[royalty_trs] Fetching transactions for {royalty_address[-6:]}...", flush=True)
+        print(f"[royalty_trs] Fetching transactions for {royalty_address}...", flush=True)
         transactions = await toncenter_api.get_transactions(royalty_address, limit=25)
         
-        if not transactions:
-            print(f"[royalty_trs] No transactions found for {royalty_address[-6:]}", flush=True)
+        # DEBUG DETTAGLIATO ARRAY
+        print(f"[DEBUG] Transactions variable type: {type(transactions)}")
+        print(f"[DEBUG] Transactions is None? {transactions is None}")
+        print(f"[DEBUG] Transactions is list? {isinstance(transactions, list)}")
+        
+        if transactions is None:
+            print(f"[DEBUG] ❌ get_transactions() returned None (API error?)", flush=True)
+            return None
+        
+        if not transactions:  # Lista vuota
+            print(f"[DEBUG] ✅ get_transactions() returned EMPTY list []", flush=True)
+            print(f"[DEBUG] This means: TON Center API responded with 200 but no transactions for this address", flush=True)
+            print(f"[DEBUG] Address {royalty_address} may have 0 transactions or wrong address", flush=True)
             return None
         
         print(f"[royalty_trs] Found {len(transactions)} transactions for {royalty_address[-6:]}", flush=True)
+        
+        # DEBUG: Mostra prime 3 transazioni
+        print(f"[DEBUG] First 3 transactions sample:")
+        for i, tx in enumerate(transactions[:3]):
+            tx_time = tx.get("utime", 0)
+            tx_hash = tx.get("hash", "")[:10] + "..." if tx.get("hash") else "no-hash"
+            tx_type = "IN" if tx.get("in_msg") else "OUT"
+            print(f"  TX{i}: utime={tx_time} ({time.ctime(tx_time) if tx_time > 0 else 'N/A'})")
+            print(f"       hash: {tx_hash}, type: {tx_type}")
+            
+            if tx.get("in_msg"):
+                source = tx["in_msg"].get("source", {}).get("address", "no-source")
+                print(f"       source: {source[-8:] if source else 'no-source'}")
+        
+        # STATISTICHE
+        stats = {
+            "total": len(transactions),
+            "already_processed": 0,      # tx_time <= last_utime
+            "new_transactions": 0,       # tx_time > last_utime
+            "new_no_source": 0,          # nuove ma senza source address
+            "new_not_sale": 0,           # nuove ma non vendite NFT
+            "new_invalid_sale": 0,       # nuove con sale data invalido
+            "new_nft_sales": 0,          # nuove vendite NFT valide
+            "new_monitored": 0,          # nuove in collezioni monitorate
+            "utime_range": {
+                "min": min(tx.get("utime", 0) for tx in transactions) if transactions else 0,
+                "max": max(tx.get("utime", 0) for tx in transactions) if transactions else 0,
+            }
+        }
         
         latest_utime = last_utime
         processed_count = 0
@@ -242,8 +283,13 @@ async def royalty_trs(royalty_address: str):
         for tx in transactions:
             tx_time = tx.get("utime", 0)
             
+            # FILTRO 1: UTIME (già processate?)
             if tx_time <= last_utime:
+                stats["already_processed"] += 1
                 continue
+            
+            # NUOVA TRANSAZIONE
+            stats["new_transactions"] += 1
             
             if tx_time > latest_utime:
                 latest_utime = tx_time
@@ -251,24 +297,36 @@ async def royalty_trs(royalty_address: str):
             in_msg = tx.get("in_msg", {})
             source = in_msg.get("source", {}).get("address")
             
+            # FILTRO 2: SOURCE ADDRESS
             if not source:
+                stats["new_no_source"] += 1
+                print(f"[DEBUG] ⚠️ New transaction {tx_time} has NO source address", flush=True)
                 continue
             
             print(f"[royalty_trs] Processing transaction from {source[-6:]} (utime: {tx_time})", flush=True)
             
+            # FILTRO 3: È UNA VENDITA NFT?
             stack, method_used = await toncenter_api.get_sale_data_with_retry(source)
             
             if not stack:
-                print(f"[royalty_trs] ❌ No sale data found for {source[-6:]}", flush=True)
+                stats["new_not_sale"] += 1
+                print(f"[royalty_trs] ❌ No sale data found for {source[-6:]} (not NFT sale)", flush=True)
                 continue
             
             print(f"[royalty_trs] ✅ Success with {method_used}! Stack has {len(stack)} items", flush=True)
             
+            # FILTRO 4: PARSING DATI VENDITA
             sale_data = parse_sale_stack(stack)
             
             if not sale_data or not sale_data[1]:
+                stats["new_invalid_sale"] += 1
                 print(f"[royalty_trs] ❌ Invalid sale data", flush=True)
                 continue
+            
+            # VENDITA NFT VALIDA!
+            stats["new_nft_sales"] += 1
+            sale_type = sale_data[0]
+            print(f"[DEBUG] 🎯 NFT SALE FOUND! Type: {sale_type}")
             
             nft_address = sale_data[4] if len(sale_data) > 4 else None
             
@@ -283,16 +341,20 @@ async def royalty_trs(royalty_address: str):
                 continue
             
             collection_address = nft_data[1]
+            
+            # FILTRO 5: COLLEZIONE MONITORATA?
             if collection_address not in collections_list:
                 print(f"[royalty_trs] ❌ Collection {collection_address[-6:]} not monitored", flush=True)
                 continue
             
+            stats["new_monitored"] += 1
             print(f"[royalty_trs] ✅ Collection {collection_address[-6:]} is monitored!", flush=True)
             
             print(f"[royalty_trs] Fetching floor for collection {collection_address[-6:]}...", flush=True)
             floor_data = await get_collection_floor(collection_address)
             floor_price, floor_link = floor_data
             
+            # INVIO NOTIFICA
             try:
                 if sale_data[0] == 'SaleFixPrice':
                     price = sale_data[6] if len(sale_data) > 6 else 0
@@ -327,8 +389,26 @@ async def royalty_trs(royalty_address: str):
             except Exception as e:
                 print(f"[royalty_trs] ❌ Telegram error: {e}", flush=True)
         
-        print(f"[royalty_trs] Processed {processed_count} new sales", flush=True)
-        return latest_utime if latest_utime > last_utime else None
+        # REPORT STATISTICHE FINALE
+        print(f"\n[STATS] ======= TRANSACTION ANALYSIS =======")
+        print(f"[STATS] Total transactions from API: {stats['total']}")
+        print(f"[STATS] Time range: {stats['utime_range']['min']} → {stats['utime_range']['max']}")
+        print(f"[STATS] Already processed (utime filter): {stats['already_processed']}")
+        print(f"[STATS] New transactions found: {stats['new_transactions']}")
+        print(f"[STATS]   - No source address: {stats['new_no_source']}")
+        print(f"[STATS]   - Not NFT sales: {stats['new_not_sale']}")
+        print(f"[STATS]   - Invalid sale data: {stats['new_invalid_sale']}")
+        print(f"[STATS]   - Valid NFT sales: {stats['new_nft_sales']}")
+        print(f"[STATS]   - In monitored collections: {stats['new_monitored']}")
+        print(f"[STATS] Final notifications sent: {processed_count}")
+        print(f"[STATS] Latest utime this cycle: {latest_utime}")
+        print(f"[STATS] ====================================\n")
+        
+        # Aggiorna lastUtime solo se abbiamo processato qualcosa
+        if processed_count > 0 or stats['new_transactions'] > 0:
+            return latest_utime if latest_utime > last_utime else None
+        else:
+            return None
     
     except Exception as e:
         print(f"[royalty_trs] CRITICAL Error for {royalty_address[-6:]}: {e}", flush=True)
