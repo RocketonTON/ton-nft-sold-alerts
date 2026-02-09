@@ -85,53 +85,59 @@ class TonCenterAPI:
         print(f"[DEBUG] Using API: {self.base_url}")
     
     async def get_transactions(self, address: str, limit: int = 10) -> list:
-        """Test both archival formats"""
-        
-        # Prova prima come stringa (per v2/v3)
-        archival_formats = ["true", True]
-        
-        for archival_value in archival_formats:
-            try:
-                print(f"[DEBUG] Testing archival={archival_value} (type: {type(archival_value).__name__})")
+    """Fetch transactions - test multiple approaches"""
+    
+    # Testa diverse combinazioni di parametri
+    test_cases = [
+        {"archival": "true"},   # 1. Con archival
+        {},                     # 2. Senza archival (più transazioni)
+        {"archival": "false"},  # 3. Solo non-archival
+    ]
+    
+    for params_test in test_cases:
+        try:
+            print(f"[DEBUG] Testing params: {params_test}")
+            
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                # Parametri base
+                base_params = {
+                    "address": address,
+                    "limit": limit,
+                }
+                # Combina con test case
+                params = {**base_params, **params_test}
                 
-                async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                    url = f"{self.base_url}/getTransactions"
-                    params = {
-                        "address": address,
-                        "limit": limit,
-                        "archival": archival_value,
-                    }
+                url = f"{self.base_url}/getTransactions"
+                
+                async with session.get(url, headers=self.headers, params=params) as response:
                     
-                    # DEBUG: mostra cosa stai inviando
-                    import json
-                    print(f"[DEBUG] Sending params: {json.dumps(params)}")
+                    print(f"[DEBUG] Status: {response.status}")
                     
-                    async with session.get(url, headers=self.headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        txs = data.get("transactions", [])
+                        print(f"[TON Center] ✅ Got {len(txs)} transactions with params: {params_test}")
                         
-                        print(f"[DEBUG] Response status: {response.status}")
-                        
-                        if response.status == 200:
-                            data = await response.json()
-                            txs = data.get("transactions", [])
-                            print(f"[TON Center] ✅ Success with archival={archival_value}! Got {len(txs)} transactions")
+                        if txs:
+                            # Mostra qualche info sulle transazioni
+                            for i, tx in enumerate(txs[:3]):  # Prime 3 transazioni
+                                print(f"  TX {i}: utime={tx.get('utime')}, hash={tx.get('hash', '')[:10]}...")
                             return txs
-                        
-                        elif response.status == 400 or response.status == 500:
-                            error_text = await response.text()
-                            print(f"[DEBUG] Failed with archival={archival_value}: {error_text[:200]}")
-                            continue  # Prova il formato successivo
-                        
                         else:
-                            error_text = await response.text()
-                            print(f"[TON Center] HTTP {response.status}: {error_text[:200]}")
-                            return []
-                
-            except Exception as e:
-                print(f"[DEBUG] Error with archival={archival_value}: {e}")
-                continue
+                            print(f"[TON Center] ⚠️ 0 transactions with params: {params_test}")
+                            continue  # Prova combinazione successiva
+                    
+                    else:
+                        error_text = await response.text()
+                        print(f"[DEBUG] Failed: {error_text[:100]}")
+                        continue
         
-        print(f"[TON Center] ❌ All archival formats failed")
-        return []
+        except Exception as e:
+            print(f"[DEBUG] Error: {e}")
+            continue
+    
+    print(f"[TON Center] ❌ No transactions found with any parameters")
+    return []
     
     async def run_get_method(self, address: str, method: str, stack: list = None) -> list:
         """Execute a get method on a smart contract"""
