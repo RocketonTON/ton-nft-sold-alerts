@@ -7,6 +7,8 @@ current_path = pathlib.Path(__file__).parent.resolve()
 # === TON CENTER API CONFIG ===
 TONCENTER_API_V3 = "https://toncenter.com/api/v3"
 TONCENTER_API_V2 = "https://toncenter.com/api/v2"
+TONCENTER_RATE_LIMIT = 1  # secondi tra le richieste
+
 
 # === BOT CONFIGURATION ===
 trs_limit = 50
