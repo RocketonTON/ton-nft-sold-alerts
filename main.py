@@ -59,79 +59,94 @@ async def get_client():
     return client
 
 async def royalty_trs(royalty_address):
-    utimes = list()
-    LAST_UTIME_PATH = '/tmp/lastUtime.txt'
-    
     try:
-        with open(LAST_UTIME_PATH, 'r') as f:
-            last_utime = int(f.read().strip())
-    except FileNotFoundError:
-        print(f"[royalty_trs] Creazione nuovo file lastUtime a {LAST_UTIME_PATH}", flush=True)
-        last_utime = 0
-        with open(LAST_UTIME_PATH, 'w') as f:
-            f.write('0')
-    except ValueError:
-        print(f"[royalty_trs] Contenuto non valido nel file lastUtime, reset a 0", flush=True)
-        last_utime = 0
-        with open(LAST_UTIME_PATH, 'w') as f:
-            f.write('0')
-    
-    print(f"[royalty_trs] Avvio con last_utime: {last_utime}", flush=True)
-    
-    client = await get_client()
-    
-    try:
-        trs = await client.get_transactions(account=royalty_address, limit=trs_limit)
+        utimes = list()
+        LAST_UTIME_PATH = '/tmp/lastUtime.txt'
+        
+        # Leggi last_utime
+        try:
+            with open(LAST_UTIME_PATH, 'r') as f:
+                last_utime = int(f.read().strip())
+        except FileNotFoundError:
+            print(f"[royalty_trs] Creating new lastUtime file", flush=True)
+            last_utime = 0
+            with open(LAST_UTIME_PATH, 'w') as f:
+                f.write('0')
+        except ValueError:
+            print(f"[royalty_trs] Invalid content, resetting to 0", flush=True)
+            last_utime = 0
+            with open(LAST_UTIME_PATH, 'w') as f:
+                f.write('0')
+        
+        print(f"[royalty_trs] Processing {royalty_address}, last_utime: {last_utime}", flush=True)
+        
+        # Ottieni client
+        client = await get_client()
+        
+        try:
+            # Ottieni transazioni
+            trs = await client.get_transactions(account=royalty_address, limit=trs_limit)
+            
+            if not trs:
+                print(f"[royalty_trs] No transactions found for {royalty_address}", flush=True)
+                await client.close()
+                return None
+            
+            # Processa transazioni
+            for tr in trs[::-1]:
+                sc_address = tr['in_msg']['source']
+                
+                if not sc_address or tr['utime'] <= last_utime:
+                    continue
+                
+                for method in get_methods:
+                    try:
+                        response = await client.raw_run_method(address=sc_address, method=method, stack_data=[])
+                        
+                        if response and response['exit_code'] == 0:
+                            sale_contract_data = parse_sale_stack(response['stack'])
+                            
+                            if sale_contract_data and sale_contract_data[1]:
+                                sale_nft_data = await get_nft_data(client, sale_contract_data[4])
+                                
+                                if (sale_nft_data and sale_nft_data[1] in collections_list and sale_nft_data[0]):
+                                    collection_floor_data = get_collection_floor(sale_nft_data[1])
+                                    
+                                    # Invio messaggio
+                                    if sale_contract_data[0] == 'SaleFixPrice':
+                                        await tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
+                                                       sale_contract_data[5], sale_nft_data[2], sale_contract_data[6],
+                                                       sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
+                                                       collection_floor_data[1])
+                                    elif sale_contract_data[0] == 'SaleAuction':
+                                        await tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
+                                                       sale_contract_data[5], sale_nft_data[2], sale_contract_data[11],
+                                                       sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
+                                                       collection_floor_data[1])
+                                    elif sale_contract_data[0] == 'SaleOffer':
+                                        await tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
+                                                       sale_contract_data[5], sale_nft_data[2], sale_contract_data[6],
+                                                       sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
+                                                       collection_floor_data[1])
+                                    
+                                    utimes.append(tr['utime'])
+                    
+                    except Exception as e:
+                        print(f"[royalty_trs] Error in method {method} for {sc_address}: {e}", flush=True)
+                        continue
+            
+            await client.close()
+            
+            # Restituisci l'ultimo utime
+            return utimes[-1] if utimes else None
+            
+        except Exception as e:
+            print(f"[royalty_trs] Failed to get transactions for {royalty_address}: {e}", flush=True)
+            await client.close()
+            return None
+            
     except Exception as e:
-        print(f'[royalty_trs] Richiesta Get per indirizzo ({royalty_address}) fallita!\n{e}\n\n')
-
-    if trs is not None:
-        for tr in trs[::-1]:
-            sc_address = tr['in_msg']['source']
-
-            if tr['utime'] <= last_utime or tr['in_msg']['source'] == '':
-                continue
-
-            for method in get_methods:
-                try:
-                    response = await client.raw_run_method(address=sc_address, method=method, stack_data=[])
-                except Exception as e:
-                    print(f'[royalty_trs] Errore in raw run ({method}). Problemi con ({sc_address}):\n{e}')
-
-                if response is not None and response['exit_code'] == 0:
-                    sale_contract_data = parse_sale_stack(response['stack'])
-
-                    if sale_contract_data is not None and sale_contract_data[1]:
-                        sale_nft_data = await get_nft_data(client, sale_contract_data[4])
-
-                        if sale_nft_data is not None and sale_nft_data[1] in collections_list and sale_nft_data[0]:
-                            collection_floor_data = get_collection_floor(sale_nft_data[1])
-
-                            if sale_contract_data[0] == 'SaleFixPrice':
-                                await tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
-                                               sale_contract_data[5], sale_nft_data[2], sale_contract_data[6],
-                                               sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
-                                               collection_floor_data[1])
-
-                            elif sale_contract_data[0] == 'SaleAuction':
-                                await tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
-                                               sale_contract_data[5], sale_nft_data[2], sale_contract_data[11],
-                                               sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
-                                               collection_floor_data[1])
-
-                            elif sale_contract_data[0] == 'SaleOffer':
-                                await tg_message(sale_contract_data[0], sale_contract_data[3], sale_contract_data[4],
-                                               sale_contract_data[5], sale_nft_data[2], sale_contract_data[6],
-                                               sale_nft_data[3], sale_nft_data[4], collection_floor_data[0],
-                                               collection_floor_data[1])
-
-                            utimes.append(tr['utime'])
-
-    await client.close()
-
-    try:
-        return utimes[-1] if utimes else None
-    except:
+        print(f"[royalty_trs] Critical error: {e}", flush=True)
         return None
 
 async def scheduler():
