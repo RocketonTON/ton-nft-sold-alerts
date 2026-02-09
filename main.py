@@ -590,7 +590,7 @@ async def royalty_trs(royalty_address: str):
         return None
 
 async def test_direct_api_call(address: str):
-    """Test diretto per verificare che l'API v3 funzioni"""
+    """Test diretto per verificare che l'API v3 funzioni - FIXED VERSION"""
     try:
         print(f"\n[DIRECT TEST] Testing API v3 directly for {address[-8:]}")
         
@@ -607,25 +607,72 @@ async def test_direct_api_call(address: str):
                 
                 if response.status == 200:
                     data = await response.json()
-                    txs = data.get("transactions", [])
-                    print(f"[DIRECT TEST] Found {len(txs)} transactions")
+                    print(f"[DIRECT TEST] Response keys: {list(data.keys())}")
+                    
+                    # CERCA TRANSAZIONI IN VARI PUNTI
+                    txs = []
+                    
+                    # Caso 1: direttamente in "transactions"
+                    if "transactions" in data:
+                        txs = data["transactions"]
+                        print(f"[DIRECT TEST] Found {len(txs)} transactions in 'transactions' key")
+                    
+                    # Caso 2: in "result" -> "transactions"
+                    elif "result" in data and isinstance(data["result"], dict):
+                        if "transactions" in data["result"]:
+                            txs = data["result"]["transactions"]
+                            print(f"[DIRECT TEST] Found {len(txs)} transactions in 'result.transactions'")
+                    
+                    print(f"[DIRECT TEST] Total transactions found: {len(txs)}")
                     
                     if txs:
-                        print(f"[DIRECT TEST] Sample transaction:")
-                        print(f"  Hash: {txs[0].get('hash', 'N/A')[:15]}...")
-                        print(f"  Time: {txs[0].get('now', 'N/A')}")
-                        print(f"  Account: {txs[0].get('account', {}).get('address', 'N/A')[-10:]}")
+                        print(f"[DIRECT TEST] Sample transaction structure:")
+                        
+                        # VERIFICA IL TIPO DELLA PRIMA TRANSAZIONE
+                        first_tx = txs[0]
+                        print(f"  Type of first TX: {type(first_tx)}")
+                        
+                        if isinstance(first_tx, dict):
+                            print(f"  Keys in first TX: {list(first_tx.keys())}")
+                            
+                            # Stampa sicura dei valori (usa get solo se è dict)
+                            safe_get = lambda obj, key: obj.get(key, 'N/A') if isinstance(obj, dict) else f'Not a dict: {type(obj)}'
+                            
+                            print(f"  Hash: {safe_get(first_tx, 'hash')[:15]}...")
+                            print(f"  Time (now): {safe_get(first_tx, 'now')}")
+                            
+                            # Gestione sicura dell'account
+                            account_data = safe_get(first_tx, 'account')
+                            if isinstance(account_data, dict):
+                                print(f"  Account address: {account_data.get('address', 'N/A')[-10:]}")
+                            else:
+                                print(f"  Account: {account_data}")
+                        
+                        elif isinstance(first_tx, list):
+                            print(f"  First TX is a list with {len(first_tx)} items")
+                            for i, item in enumerate(first_tx[:3]):
+                                print(f"    [{i}]: type={type(item)}, value={str(item)[:50]}")
+                        
+                        elif isinstance(first_tx, str):
+                            print(f"  First TX is a string: {first_tx[:100]}")
+                    
                     else:
                         print(f"[DIRECT TEST] API returned success but empty transactions array")
-                        print(f"[DIRECT TEST] Full response keys: {list(data.keys())}")
+                        print(f"[DIRECT TEST] Full response structure:")
+                        print(json.dumps(data, indent=2)[:1000])
+                        
                         # Stampa altri campi utili
                         if "total" in data:
                             print(f"[DIRECT TEST] Total count in response: {data['total']}")
+                
                 else:
                     error_text = await response.text()
                     print(f"[DIRECT TEST] Error: {error_text[:200]}")
+    
     except Exception as e:
         print(f"[DIRECT TEST] Exception: {e}")
+        traceback.print_exc()
+
 
 async def scheduler():
     """Main bot loop - UPDATED LOG MESSAGES"""
