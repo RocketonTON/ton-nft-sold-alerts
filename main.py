@@ -71,12 +71,12 @@ if toncenter_api_key:
 HTTP_TIMEOUT = aiohttp.ClientTimeout(total=20)
 
 class TonCenterAPI:
-    """Async TON Center API client"""
     
     def __init__(self):
         self.base_url = TONCENTER_API_V3
         self.headers = TONCENTER_HEADERS
         self.timeout = HTTP_TIMEOUT
+        self.min_request_interval = TONCENTER_RATE_LIMIT
     
     async def get_transactions(self, address: str, limit: int = 25) -> list:
         """Fetch transactions for an address"""
