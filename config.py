@@ -1,20 +1,39 @@
 import telepot
+import os
 import pathlib
 
-from secretData import *
-
-bot = telepot.Bot(bot_token)
+# === PERCORSO ===
 current_path = pathlib.Path(__file__).parent.resolve()
 
+# === TOKEN E CREDENZIALI (da variabili d'ambiente) ===
+# Telegram
+bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+# Inizializza bot telepot
+if bot_token:
+    bot = telepot.Bot(bot_token)
+else:
+    bot = None
+    print("[CONFIG] ⚠️ Telegram bot token non configurato")
+
+# TonAPI
+tonapi_token = os.environ.get("TONAPI_TOKEN", "")
+
+# CoinMarketCap (opzionale)
+cmc_token = os.environ.get("CMC_TOKEN", "")
+
+# === LISTE DINAMICHE (da variabili d'ambiente) ===
+# Formato: "EQAA4W2tr...,EQCgRvXb...,EQDrLq-X..."
+royalty_addresses_str = os.environ.get("ROYALTY_ADDRESSES", "")
+collections_list_str = os.environ.get("MONITORED_COLLECTIONS", "")
+
+# Converti stringhe in liste
+royalty_addresses = [addr.strip() for addr in royalty_addresses_str.split(",") if addr.strip()] if royalty_addresses_str else []
+collections_list = [addr.strip() for addr in collections_list_str.split(",") if addr.strip()] if collections_list_str else []
+
+# === CONFIGURAZIONI FISSE ===
 trs_limit = 50
-
-royalty_addresses = [#'EQAA4W2tr6JdJsyej6Ix5tckcwsiRwWmLuI67Tznj1JlaP4X',  # Toned Ape Club!
-                     #'EQCgRvXbOJeFSRKnEg1D-i0SqDMlaNVGvpSSKCzDQU_wDAR4',  # Tonex
-                     ]
-
-collections_list = [#'EQCzuSjkgUND61l7gIH3NvVWNtZ0RX1hxz1rWnmJqGPmZh7S',  # Toned Ape Club!
-                    ]
-
 ton_config_url = 'https://ton.org/global-config.json'
 tonorg_price_url = 'https://ton.org/getpriceg/'
 tonapi_url = 'https://tonapi.io/v1/'
@@ -22,38 +41,82 @@ getgems_api_url = 'https://api.getgems.io/graphql'
 getgems_user_url = 'https://getgems.io/user/'
 cmc_url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
 
-get_methods = ['get_sale_data',
-               'get_offer_data']
+get_methods = ['get_sale_data', 'get_offer_data']
 
 markets = {
-           'EQBYTuYbLf8INxFtD8tQeNk5ZLy-nAX9ahQbG_yl1qQ-GEMS': 'Getgems',
-           'EQCjc483caXMwWw2kwl2afFquAPO0LX1VyZbnZUs3toMYkk9': 'Getgems',
-           'EQCgRvXbOJeFSRKnEg1D-i0SqDMlaNVGvpSSKCzDQU_wDAR4': 'Tonex',
-           'EQDrLq-X6jKZNHAScgghh0h1iog3StK71zn8dcmrOj8jPWRA': 'Disintar',
-           'EQAezbdnLVsLSq8tnVVzaHxxkKpoSYBNnn1673GXWsA-Lu_w': 'Diamonds',
-          }
+    'EQBYTuYbLf8INxFtD8tQeNk5ZLy-nAX9ahQbG_yl1qQ-GEMS': 'Getgems',
+    'EQCjc483caXMwWw2kwl2afFquAPO0LX1VyZbnZUs3toMYkk9': 'Getgems',
+    'EQCgRvXbOJeFSRKnEg1D-i0SqDMlaNVGvpSSKCzDQU_wDAR4': 'Tonex',
+    'EQDrLq-X6jKZNHAScgghh0h1iog3StK71zn8dcmrOj8jPWRA': 'Disintar',
+    'EQAezbdnLVsLSq8tnVVzaHxxkKpoSYBNnn1673GXWsA-Lu_w': 'Diamonds',
+}
 
 markets_links = {
-                 'Getgems': 'https://getgems.io/nft/',
-                 'Tonex': 'https://tonex.app/nft/market/nfts/',
-                 'Disintar': 'https://beta.disintar.io/object/',
-                 'Diamonds': 'https://ton.diamonds/explorer/',
-                }
+    'Getgems': 'https://getgems.io/nft/',
+    'Tonex': 'https://tonex.app/nft/market/nfts/',
+    'Disintar': 'https://beta.disintar.io/object/',
+    'Diamonds': 'https://ton.diamonds/explorer/',
+}
 
-getgems_query = "query nftSearch($count: Int!, $cursor: String, $query: String, $sort: String) " \
-                "{\n  alphaNftItemSearch(first: $count, after: $cursor, query: $query, sort: $sort) " \
-                "{\n    edges {\n      node {\n        ...nftPreview\n        __typename\n      }" \
-                "\n      cursor\n      __typename\n    }\n    info {\n      hasNextPage\n      __typename\n    }" \
-                "\n    __typename\n  }\n}\n\nfragment nftPreview on NftItem {\n  name\n  previewImage: content " \
-                "{\n    ... on NftContentImage {\n      image {\n        sized(width: 500, height: 500)" \
-                "\n        __typename\n      }\n      __typename\n    }\n    ... on NftContentLottie " \
-                "{\n      lottie\n      fallbackImage: image {\n        sized(width: 500, height: 500)" \
-                "\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  address\n  collection " \
-                "{\n    name\n    address\n    __typename\n  }\n  sale {\n    ... on NftSaleFixPrice " \
-                "{\n      fullPrice\n      __typename\n    }\n    __typename\n  }\n  __typename\n}"
+getgems_query = """query nftSearch($count: Int!, $cursor: String, $query: String, $sort: String) {
+  alphaNftItemSearch(first: $count, after: $cursor, query: $query, sort: $sort) {
+    edges {
+      node {
+        ...nftPreview
+        __typename
+      }
+      cursor
+      __typename
+    }
+    info {
+      hasNextPage
+      __typename
+    }
+    __typename
+  }
+}
 
-cmc_params = {'slug': 'toncoin',
-              'convert': 'USD'}
+fragment nftPreview on NftItem {
+  name
+  previewImage: content {
+    ... on NftContentImage {
+      image {
+        sized(width: 500, height: 500)
+        __typename
+      }
+      __typename
+    }
+    ... on NftContentLottie {
+      lottie
+      fallbackImage: image {
+        sized(width: 500, height: 500)
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+  address
+  collection {
+    name
+    address
+    __typename
+  }
+  sale {
+    ... on NftSaleFixPrice {
+      fullPrice
+      __typename
+    }
+    __typename
+  }
+  __typename
+}"""
 
-cmc_headers = {'Accepts': 'application/json',
-               'X-CMC_PRO_API_KEY': cmc_token}
+cmc_params = {'slug': 'toncoin', 'convert': 'USD'}
+cmc_headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': cmc_token}
+
+# === DEBUG: Verifica caricamento variabili ===
+print(f"[CONFIG DEBUG] Royalty addresses loaded: {len(royalty_addresses)}")
+print(f"[CONFIG DEBUG] Collections loaded: {len(collections_list)}")
+print(f"[CONFIG DEBUG] Telegram bot: {'✅ Inizializzato' if bot else '❌ Non inizializzato'}")
+print(f"[CONFIG DEBUG] TonAPI token: {'✅' if tonapi_token else '❌'}")f tonapi_token else '❌'}")
