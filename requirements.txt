@@ -23,4 +23,13 @@ frozenlist>=1.6.0
 aiohttp>=3.9.0
 yarl>=1.9.4
 setuptools>=65.5.0
+# Pacchetti di sistema necessari
+wheel>=0.40.0
+
+
+
+# Dipendenze opzionali ma consigliate
+pytoniq-core>=0.1.36
+pytoniq>=0.1.40
+Flask>=3.1.0
 
