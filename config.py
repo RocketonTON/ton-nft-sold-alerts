@@ -1,20 +1,12 @@
 import os
-import pathlib
 
 # === PERCORSO ===
-current_path = pathlib.Path(__file__).parent.resolve()
+current_path = os.path.dirname(os.path.abspath(__file__))
 
 # === TOKEN E CREDENZIALI (da variabili d'ambiente) ===
 # Telegram
 bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-
-# Inizializza bot telepot
-if bot_token:
-    bot = telepot.Bot(bot_token)
-else:
-    bot = None
-    print("[CONFIG] ⚠️ Telegram bot token non configurato")
 
 # TonAPI
 tonapi_token = os.environ.get("TONAPI_TOKEN", "")
@@ -23,7 +15,6 @@ tonapi_token = os.environ.get("TONAPI_TOKEN", "")
 cmc_token = os.environ.get("CMC_TOKEN", "")
 
 # === LISTE DINAMICHE (da variabili d'ambiente) ===
-# Formato: "EQAA4W2tr...,EQCgRvXb...,EQDrLq-X..."
 royalty_addresses_str = os.environ.get("ROYALTY_ADDRESSES", "")
 collections_list_str = os.environ.get("MONITORED_COLLECTIONS", "")
 
@@ -115,6 +106,7 @@ cmc_params = {'slug': 'toncoin', 'convert': 'USD'}
 cmc_headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': cmc_token}
 
 # === DEBUG: Verifica caricamento variabili ===
-print(f"[CONFIG DEBUG] Royalty addresses loaded: {len(royalty_addresses)}")
-print(f"[CONFIG DEBUG] Collections loaded: {len(collections_list)}")
-print(f"[CONFIG DEBUG] Telegram bot: {'✅ Inizializzato' if bot else '❌ Non inizializzato'}")
+print(f"[CONFIG] Royalty addresses loaded: {len(royalty_addresses)}")
+print(f"[CONFIG] Collections loaded: {len(collections_list)}")
+print(f"[CONFIG] Telegram bot token: {'✅ Presente' if bot_token else '❌ Assente'}")
+print(f"[CONFIG] TonAPI token: {'✅ Presente' if tonapi_token else '❌ Assente'}")
