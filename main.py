@@ -137,7 +137,8 @@ async def scheduler():
 
 
 if __name__ == '__main__':
-    asyncio.run(scheduler())            last_utime = int(f.read().strip())
+    asyncio.run(scheduler())            
+    last_utime = int(f.read().strip())
     except FileNotFoundError:
         # 2. SE NON ESISTE, CREALO CON VALORE 0
         print(f"[royalty_trs] Creating new lastUtime file at {LAST_UTIME_PATH}", flush=True)
