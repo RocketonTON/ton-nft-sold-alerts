@@ -85,167 +85,167 @@ class TonCenterAPI:
         print(f"[DEBUG] API Key present: {'Yes' if toncenter_api_key else 'No (rate limited)'}")
     
     async def get_transactions(self, address: str, limit: int = 25) -> list:
-    """Fetch transactions using correct TON Center API v3 endpoint and parameters - FIXED VERSION"""
-    
-    print(f"\n[DEBUG] get_transactions called for: {address[-8:]}")
-    print(f"[DEBUG] Base URL: {self.base_url}")
-    
-    # Endpoint corretto per v3
-    endpoint = "/transactions"
-    url = f"{self.base_url}{endpoint}"
-    
-    # Test diverse strategie per la v3
-    test_cases = [
-        {
-            "name": "desc_with_archival",
-            "params": {
-                "account": address,
-                "limit": limit,
-                "sort": "desc",
-                "archival": "true"
+        """Fetch transactions using correct TON Center API v3 endpoint and parameters - FIXED VERSION"""
+        
+        print(f"\n[DEBUG] get_transactions called for: {address[-8:]}")
+        print(f"[DEBUG] Base URL: {self.base_url}")
+        
+        # Endpoint corretto per v3
+        endpoint = "/transactions"
+        url = f"{self.base_url}{endpoint}"
+        
+        # Test diverse strategie per la v3
+        test_cases = [
+            {
+                "name": "desc_with_archival",
+                "params": {
+                    "account": address,
+                    "limit": limit,
+                    "sort": "desc",
+                    "archival": "true"
+                }
+            },
+            {
+                "name": "desc_no_archival",
+                "params": {
+                    "account": address,
+                    "limit": limit,
+                    "sort": "desc",
+                    "archival": "false"
+                }
             }
-        },
-        {
-            "name": "desc_no_archival",
-            "params": {
-                "account": address,
-                "limit": limit,
-                "sort": "desc",
-                "archival": "false"
-            }
-        }
-    ]
-    
-    for test_case in test_cases:
-        try:
-            print(f"\n[DEBUG] Testing strategy: {test_case['name']}")
-            print(f"[DEBUG] Request URL: {url}")
-            print(f"[DEBUG] Request params: {test_case['params']}")
-            
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.get(
-                    url, 
-                    headers=self.headers, 
-                    params=test_case['params']
-                ) as response:
-                    
-                    status = response.status
-                    print(f"[DEBUG] Response status: {status}")
-                    
-                    if status == 200:
-                        # PRIMA: Leggi la risposta RAW per debug
-                        raw_response = await response.text()
-                        print(f"[DEBUG] Raw response length: {len(raw_response)} chars")
-                        print(f"[DEBUG] First 500 chars of response: {raw_response[:500]}")
+        ]
+        
+        for test_case in test_cases:
+            try:
+                print(f"\n[DEBUG] Testing strategy: {test_case['name']}")
+                print(f"[DEBUG] Request URL: {url}")
+                print(f"[DEBUG] Request params: {test_case['params']}")
+                
+                async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                    async with session.get(
+                        url, 
+                        headers=self.headers, 
+                        params=test_case['params']
+                    ) as response:
                         
-                        try:
-                            data = await response.json()
-                            print(f"[DEBUG] Successfully parsed JSON")
+                        status = response.status
+                        print(f"[DEBUG] Response status: {status}")
+                        
+                        if status == 200:
+                            # PRIMA: Leggi la risposta RAW per debug
+                            raw_response = await response.text()
+                            print(f"[DEBUG] Raw response length: {len(raw_response)} chars")
+                            print(f"[DEBUG] First 500 chars of response: {raw_response[:500]}")
                             
-                            # ANALISI DELLA STRUTTURA DELLA RISPOSTA
-                            print(f"[DEBUG] Response keys: {list(data.keys())}")
-                            
-                            # CERCA LE TRANSAZIONI IN VARI PUNTI POSSIBILI
-                            txs = []
-                            
-                            # Caso 1: direttamente in "transactions"
-                            if "transactions" in data:
-                                txs = data["transactions"]
-                                print(f"[DEBUG] Found {len(txs)} transactions in 'transactions' key")
-                            
-                            # Caso 2: in "result" -> "transactions"
-                            elif "result" in data and isinstance(data["result"], dict):
-                                if "transactions" in data["result"]:
-                                    txs = data["result"]["transactions"]
-                                    print(f"[DEBUG] Found {len(txs)} transactions in 'result.transactions'")
-                            
-                            # Caso 3: la risposta è direttamente un array
-                            elif isinstance(data, list):
-                                txs = data
-                                print(f"[DEBUG] Response is direct array with {len(txs)} items")
-                            
-                            print(f"[TON Center] ✅ Got {len(txs)} transactions with {test_case['name']}")
-                            
-                            if txs:
-                                # DEBUG DETTAGLIATO DELLA PRIMA TRANSAZIONE
-                                print(f"[DEBUG] Analyzing first transaction structure:")
+                            try:
+                                data = await response.json()
+                                print(f"[DEBUG] Successfully parsed JSON")
                                 
-                                if isinstance(txs[0], dict):
-                                    print(f"[DEBUG] First TX is a dict with keys: {list(txs[0].keys())}")
+                                # ANALISI DELLA STRUTTURA DELLA RISPOSTA
+                                print(f"[DEBUG] Response keys: {list(data.keys())}")
+                                
+                                # CERCA LE TRANSAZIONI IN VARI PUNTI POSSIBILI
+                                txs = []
+                                
+                                # Caso 1: direttamente in "transactions"
+                                if "transactions" in data:
+                                    txs = data["transactions"]
+                                    print(f"[DEBUG] Found {len(txs)} transactions in 'transactions' key")
+                                
+                                # Caso 2: in "result" -> "transactions"
+                                elif "result" in data and isinstance(data["result"], dict):
+                                    if "transactions" in data["result"]:
+                                        txs = data["result"]["transactions"]
+                                        print(f"[DEBUG] Found {len(txs)} transactions in 'result.transactions'")
+                                
+                                # Caso 3: la risposta è direttamente un array
+                                elif isinstance(data, list):
+                                    txs = data
+                                    print(f"[DEBUG] Response is direct array with {len(txs)} items")
+                                
+                                print(f"[TON Center] ✅ Got {len(txs)} transactions with {test_case['name']}")
+                                
+                                if txs:
+                                    # DEBUG DETTAGLIATO DELLA PRIMA TRANSAZIONE
+                                    print(f"[DEBUG] Analyzing first transaction structure:")
                                     
-                                    # Stampa i valori chiave
-                                    important_keys = ["now", "hash", "lt", "account", "in_msg", "out_msgs"]
-                                    for key in important_keys:
-                                        if key in txs[0]:
-                                            value = txs[0][key]
-                                            print(f"  {key}: {type(value)} = {str(value)[:100]}")
+                                    if isinstance(txs[0], dict):
+                                        print(f"[DEBUG] First TX is a dict with keys: {list(txs[0].keys())}")
+                                        
+                                        # Stampa i valori chiave
+                                        important_keys = ["now", "hash", "lt", "account", "in_msg", "out_msgs"]
+                                        for key in important_keys:
+                                            if key in txs[0]:
+                                                value = txs[0][key]
+                                                print(f"  {key}: {type(value)} = {str(value)[:100]}")
+                                        
+                                        # Analisi speciale per 'account'
+                                        if "account" in txs[0]:
+                                            account_data = txs[0]["account"]
+                                            print(f"  account type: {type(account_data)}")
+                                            if isinstance(account_data, dict):
+                                                print(f"  account keys: {list(account_data.keys())}")
+                                                if "address" in account_data:
+                                                    print(f"  account.address: {account_data['address'][-8:]}")
+                                        
+                                        # Analisi speciale per 'in_msg'
+                                        if "in_msg" in txs[0]:
+                                            in_msg = txs[0]["in_msg"]
+                                            print(f"  in_msg type: {type(in_msg)}")
+                                            if isinstance(in_msg, dict):
+                                                print(f"  in_msg keys: {list(in_msg.keys())}")
+                                                if "source" in in_msg:
+                                                    source = in_msg["source"]
+                                                    print(f"  source type: {type(source)}")
+                                                    if isinstance(source, dict) and "address" in source:
+                                                        print(f"  source.address: {source['address'][-8:]}")
                                     
-                                    # Analisi speciale per 'account'
-                                    if "account" in txs[0]:
-                                        account_data = txs[0]["account"]
-                                        print(f"  account type: {type(account_data)}")
-                                        if isinstance(account_data, dict):
-                                            print(f"  account keys: {list(account_data.keys())}")
-                                            if "address" in account_data:
-                                                print(f"  account.address: {account_data['address'][-8:]}")
+                                    elif isinstance(txs[0], list):
+                                        print(f"[DEBUG] First TX is a list with {len(txs[0])} items")
+                                        for i, item in enumerate(txs[0][:5]):
+                                            print(f"  [{i}] type: {type(item)}, value: {str(item)[:50]}")
                                     
-                                    # Analisi speciale per 'in_msg'
-                                    if "in_msg" in txs[0]:
-                                        in_msg = txs[0]["in_msg"]
-                                        print(f"  in_msg type: {type(in_msg)}")
-                                        if isinstance(in_msg, dict):
-                                            print(f"  in_msg keys: {list(in_msg.keys())}")
-                                            if "source" in in_msg:
-                                                source = in_msg["source"]
-                                                print(f"  source type: {type(source)}")
-                                                if isinstance(source, dict) and "address" in source:
-                                                    print(f"  source.address: {source['address'][-8:]}")
-                                
-                                elif isinstance(txs[0], list):
-                                    print(f"[DEBUG] First TX is a list with {len(txs[0])} items")
-                                    for i, item in enumerate(txs[0][:5]):
-                                        print(f"  [{i}] type: {type(item)}, value: {str(item)[:50]}")
-                                
-                                elif isinstance(txs[0], str):
-                                    print(f"[DEBUG] First TX is a string: {txs[0][:100]}")
-                                
-                                return txs
-                            else:
-                                print(f"[TON Center] ⚠️ 0 transactions in parsed data")
-                                # Mostra cosa c'è nella risposta
-                                print(f"[DEBUG] Full response structure:")
-                                print(json.dumps(data, indent=2)[:1000])
+                                    elif isinstance(txs[0], str):
+                                        print(f"[DEBUG] First TX is a string: {txs[0][:100]}")
+                                    
+                                    return txs
+                                else:
+                                    print(f"[TON Center] ⚠️ 0 transactions in parsed data")
+                                    # Mostra cosa c'è nella risposta
+                                    print(f"[DEBUG] Full response structure:")
+                                    print(json.dumps(data, indent=2)[:1000])
+                                    continue
+                            
+                            except json.JSONDecodeError as e:
+                                print(f"[DEBUG] ❌ JSON decode error: {e}")
+                                print(f"[DEBUG] Raw response that failed to parse: {raw_response[:200]}")
+                                continue
+                            except Exception as e:
+                                print(f"[DEBUG] ❌ Error parsing response: {e}")
                                 continue
                         
-                        except json.JSONDecodeError as e:
-                            print(f"[DEBUG] ❌ JSON decode error: {e}")
-                            print(f"[DEBUG] Raw response that failed to parse: {raw_response[:200]}")
+                        elif status == 429:
+                            print(f"[TON Center] ⛔ Rate limit hit with {test_case['name']}")
+                            await asyncio.sleep(2)
                             continue
-                        except Exception as e:
-                            print(f"[DEBUG] ❌ Error parsing response: {e}")
+                        else:
+                            error_text = await response.text()
+                            print(f"[DEBUG] API Error {status}: {error_text[:200]}")
                             continue
-                    
-                    elif status == 429:
-                        print(f"[TON Center] ⛔ Rate limit hit with {test_case['name']}")
-                        await asyncio.sleep(2)
-                        continue
-                    else:
-                        error_text = await response.text()
-                        print(f"[DEBUG] API Error {status}: {error_text[:200]}")
-                        continue
+            
+            except asyncio.TimeoutError:
+                print(f"[DEBUG] Timeout with {test_case['name']}")
+                continue
+            except aiohttp.ClientError as e:
+                print(f"[DEBUG] HTTP error with {test_case['name']}: {str(e)[:100]}")
+                continue
+            except Exception as e:
+                print(f"[DEBUG] Unexpected error with {test_case['name']}: {type(e).__name__}: {str(e)[:100]}")
+                continue
         
-        except asyncio.TimeoutError:
-            print(f"[DEBUG] Timeout with {test_case['name']}")
-            continue
-        except aiohttp.ClientError as e:
-            print(f"[DEBUG] HTTP error with {test_case['name']}: {str(e)[:100]}")
-            continue
-        except Exception as e:
-            print(f"[DEBUG] Unexpected error with {test_case['name']}: {type(e).__name__}: {str(e)[:100]}")
-            continue
-    
-    print(f"[TON Center] ❌ No transactions found with any strategy")
-    return []
+        print(f"[TON Center] ❌ No transactions found with any strategy")
+        return []
     
     async def run_get_method(self, address: str, method: str, stack: list = None) -> list:
         """Execute a get method on a smart contract - API v3 COMPATIBLE"""
