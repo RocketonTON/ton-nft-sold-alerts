@@ -1,0 +1,14 @@
+# TON NFT Bot - Dependencies MINIMALI
+
+# HTTP & Async
+requests==2.31.0
+aiohttp==3.9.5
+
+# Telegram Bot (NUOVO - sostituisce telepot)
+python-telegram-bot[job-queue]==21.0.1
+
+# Gestione variabili ambiente
+python-dotenv==1.0.0
+
+# Parsing indirizzi TON
+ton==7.1.0
