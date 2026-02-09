@@ -8,6 +8,7 @@ import traceback
 import aiohttp
 import json
 from pathlib import Path
+from config import TONCENTER_RATE_LIMIT
 import sys
 
 # === DEBUG LOGGING ===
