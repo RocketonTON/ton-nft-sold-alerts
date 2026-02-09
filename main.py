@@ -81,92 +81,94 @@ class TonCenterAPI:
     
 async def get_transactions(self, address: str, limit: int = 10) -> list:
     """Fetch transactions for an address"""
-    try:  # <-- NOTA: "try:" DEVE ESSERE INDENTATO DI 4 SPAZI (o 1 TAB)
+    try:
         async with aiohttp.ClientSession(timeout=self.timeout) as session:
             url = f"{self.base_url}/getTransactions"
             params = {
                 "address": address,
                 "limit": limit,
                 "archival": True,
-                }
-                
-                async with session.get(url, headers=self.headers, 
-                                     params=params) as response:
-                    
-                    if response.status == 429:
-                        print(f"[TON Center] ⛔ Rate limit exceeded for {address[-6:]}", flush=True)
-                        return []
-                    
-                    if response.status != 200:
-                        print(f"[TON Center] HTTP {response.status} for {address[-6:]}", flush=True)
-                        return []
-                    
-                    data = await response.json()
-                    return data.get("transactions", [])
-        
-        except asyncio.TimeoutError:
-            print(f"[TON Center] Timeout for {address[-6:]}", flush=True)
-            return []
-        except Exception as e:
-            print(f"[TON Center] Error for {address[-6:]}: {e}", flush=True)
-            return []
-    
-    async def run_get_method(self, address: str, method: str, stack: list = None) -> list:
-        """Execute a get method on a smart contract"""
-        try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                url = f"{self.base_url}/runGetMethod"
-                payload = {
-                    "address": address,
-                    "method": method,
-                    "stack": stack if stack is not None else []
-                }
-                
-                async with session.post(url, headers=self.headers, 
-                                      json=payload) as response:
-                    
-                    if response.status == 429:
-                        print(f"[TON Center] ⛔ Rate limit in get_method {method}", flush=True)
-                        return None
-                    
-                    if response.status != 200:
-                        return None
-                    
-                    data = await response.json()
-                    
-                    if not data.get("success", False):
-                        return None
-                    
-                    return data.get("stack", [])
-        
-        except asyncio.TimeoutError:
-            print(f"[TON Center] Timeout in get_method {method}", flush=True)
-            return None
-        except Exception as e:
-            print(f"[TON Center] Error in get_method {method}: {e}", flush=True)
-            return None
-    
-    async def get_sale_data_with_retry(self, source_address: str) -> tuple:
-        """Get sale data with retry logic"""
-        methods = ['get_sale_data', 'get_offer_data']
-        
-        for method in methods:
-            print(f"[RETRY] Trying {method}...", flush=True)
+            }
             
-            for attempt in range(3):
-                stack = await self.run_get_method(source_address, method)
+            # STESSO LIVELLO DI "params = {" (12 spazi)
+            async with session.get(url, headers=self.headers, params=params) as response:
                 
-                if stack is not None:
-                    print(f"[RETRY] ✅ {method} succeeded on attempt {attempt+1}", flush=True)
-                    return stack, method
+                if response.status == 429:
+                    print(f"[TON Center] ⛔ Rate limit exceeded for {address[-6:]}", flush=True)
+                    return []
                 
-                if attempt < 2:
-                    print(f"[RETRY] ❌ {method} failed, waiting 2s...", flush=True)
-                    await asyncio.sleep(2)
-                else:
-                    print(f"[RETRY] ❌ {method} failed on final attempt", flush=True)
+                if response.status != 200:
+                    print(f"[TON Center] HTTP {response.status} for {address[-6:]}", flush=True)
+                    return []
+                
+                data = await response.json()
+                return data.get("transactions", [])
+    
+    # "except" DEVE ESSERE FUORI DAL "async with session:", ALLO STESSO LIVELLO DI "try:"
+    except asyncio.TimeoutError:
+        print(f"[TON Center] Timeout for {address[-6:]}", flush=True)
+        return []
+    except Exception as e:
+        print(f"[TON Center] Error for {address[-6:]}: {e}", flush=True)
+        return []
+# ========== FINE DI get_transactions ==========
+
+# ========== INIZIO NUOVI METODI SEPARATI ==========
+async def run_get_method(self, address: str, method: str, stack: list = None) -> list:
+    """Execute a get method on a smart contract"""
+    try:
+        async with aiohttp.ClientSession(timeout=self.timeout) as session:
+            url = f"{self.base_url}/runGetMethod"
+            payload = {
+                "address": address,
+                "method": method,
+                "stack": stack if stack is not None else []
+            }
+            
+            async with session.post(url, headers=self.headers, json=payload) as response:
+                
+                if response.status == 429:
+                    print(f"[TON Center] ⛔ Rate limit in get_method {method}", flush=True)
+                    return None
+                
+                if response.status != 200:
+                    return None
+                
+                data = await response.json()
+                
+                if not data.get("success", False):
+                    return None
+                
+                return data.get("stack", [])
+    
+    except asyncio.TimeoutError:
+        print(f"[TON Center] Timeout in get_method {method}", flush=True)
+        return None
+    except Exception as e:
+        print(f"[TON Center] Error in get_method {method}: {e}", flush=True)
+        return None
+
+async def get_sale_data_with_retry(self, source_address: str) -> tuple:
+    """Get sale data with retry logic"""
+    methods = ['get_sale_data', 'get_offer_data']
+    
+    for method in methods:
+        print(f"[RETRY] Trying {method}...", flush=True)
         
-        return None, None
+        for attempt in range(3):
+            stack = await self.run_get_method(source_address, method)
+            
+            if stack is not None:
+                print(f"[RETRY] ✅ {method} succeeded on attempt {attempt+1}", flush=True)
+                return stack, method
+            
+            if attempt < 2:
+                print(f"[RETRY] ❌ {method} failed, waiting 2s...", flush=True)
+                await asyncio.sleep(2)
+            else:
+                print(f"[RETRY] ❌ {method} failed on final attempt", flush=True)
+    
+    return None, None
 
 # Global API instance
 toncenter_api = TonCenterAPI()
