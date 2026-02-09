@@ -299,7 +299,7 @@ async def royalty_trs(royalty_address):
             print(f"[RETRY] ✅ Success with {method_used}! Stack has {len(stack)} items", flush=True)
             # === END NEW CODE ===
             
-            # Continue with existing parsing logic
+                        # Continue with existing parsing logic
             converted_stack = parse_tonapi_stack(stack)
             
             from functions import parse_sale_stack
@@ -309,28 +309,17 @@ async def royalty_trs(royalty_address):
                 continue
             
             nft_address = sale_data[4]
-            
-                
-                converted_stack = parse_tonapi_stack(stack)
-                
-                from functions import parse_sale_stack
-                sale_data = parse_sale_stack(converted_stack)
-                
-                if not sale_data or not sale_data[1]:
-                    continue
-                
-                nft_address = sale_data[4]
-                # Async with timeout
-                print(f"[DEBUG] Fetching NFT data for {nft_address[-6:]}...", flush=True)
-                try:
-                    nft_data = await asyncio.wait_for(
-                        get_nft_data_http(nft_address),
-                        timeout=15
-                    )
-                    print(f"[DEBUG] NFT data fetched: {nft_data[3] if nft_data else 'None'}", flush=True)
-                except asyncio.TimeoutError:
-                    print(f"[DEBUG] ⏱️ TIMEOUT fetching NFT data for {nft_address[-6:]}", flush=True)
-                    continue
+            # Async with timeout
+            print(f"[DEBUG] Fetching NFT data for {nft_address[-6:]}...", flush=True)
+            try:
+                nft_data = await asyncio.wait_for(
+                    get_nft_data_http(nft_address),
+                    timeout=15
+                )
+                print(f"[DEBUG] NFT data fetched: {nft_data[3] if nft_data else 'None'}", flush=True)
+            except asyncio.TimeoutError:
+                print(f"[DEBUG] ⏱️ TIMEOUT fetching NFT data for {nft_address[-6:]}", flush=True)
+                continue
                 
                 if not nft_data or nft_data[1] not in collections_list:
                     print(f"[DEBUG] NFT collection {nft_data[1][-6:] if nft_data else 'None'} not in monitored collections", flush=True)
