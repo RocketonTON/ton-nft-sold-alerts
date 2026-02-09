@@ -86,8 +86,7 @@ class TonCenterAPI:
                 url = f"{self.base_url}/getTransactions"
                 params = {
                     "address": address,
-                    "limit": limit,
-                    "archival": "true"
+                    "limit": limit
                 }
                 
                 async with session.get(url, headers=self.headers, 
