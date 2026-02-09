@@ -58,3 +58,11 @@ query nftSearch($count: Int!, $cursor: String, $query: String, $sort: String) {
 
 # GET methods to try
 get_methods = ['get_sale_data', 'get_offer_data']
+
+# Aggiungi queste righe alla fine di config.py, PRIMA dell'ultima riga:
+
+# CoinMarketCap headers
+cmc_headers = {
+    'Accepts': 'application/json',
+    'X-CMC_PRO_API_KEY': ''  # Sarà popolata dinamicamente da secretData.cmc_token
+}
