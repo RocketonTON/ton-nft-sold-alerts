@@ -79,7 +79,7 @@ class TonCenterAPI:
         self.timeout = HTTP_TIMEOUT
         self.min_request_interval = TONCENTER_RATE_LIMIT
     
-    async def get_transactions(self, address: str, limit: int = 25) -> list:
+    async def get_transactions(self, address: str, limit: int = 10) -> list:
         """Fetch transactions for an address"""
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
