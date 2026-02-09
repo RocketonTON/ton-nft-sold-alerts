@@ -250,23 +250,66 @@ async def royalty_trs(royalty_address):
             if not source:
                 continue
             
-            get_methods = ['get_sale_data', 'get_offer_data']
+                        # === NEW CODE WITH RETRY 3×3 AND 2s WAIT ===
+            print(f"[RETRY] Processing transaction from {source[-6:]}", flush=True)
             
-            for method in get_methods:
-                # Async with timeout
-                print(f"[DEBUG] Calling {method} on {source[-6:]}...", flush=True)
-                try:
-                    stack = await asyncio.wait_for(
-                        run_get_method_http(source, method),
-                        timeout=15  # Max 15 seconds per call
-                    )
-                    print(f"[DEBUG] {method} on {source[-6:]} returned {len(stack) if stack else 0} items", flush=True)
-                except asyncio.TimeoutError:
-                    print(f"[DEBUG] ⏱️ TIMEOUT {method} on {source[-6:]} after 15s", flush=True)
-                    continue
+            stack = None
+            method_used = None
+            
+            # FIRST METHOD: get_sale_data (3 attempts)
+            for attempt in range(3):
+                print(f"[RETRY] get_sale_data attempt {attempt+1}/3", flush=True)
+                stack = await run_get_method_http(source, 'get_sale_data')
                 
-                if not stack:
-                    continue
+                if stack is not None:
+                    print(f"[RETRY] ✅ get_sale_data succeeded on attempt {attempt+1}", flush=True)
+                    method_used = 'get_sale_data'
+                    break
+                else:
+                    if attempt < 2:  # Don't wait after the last attempt
+                        print(f"[RETRY] ❌ get_sale_data failed, waiting 2s...", flush=True)
+                        await asyncio.sleep(2)  # Fixed 2 seconds wait
+                    else:
+                        print(f"[RETRY] ❌ get_sale_data failed on final attempt", flush=True)
+            
+            # SECOND METHOD: get_offer_data (only if first fails, 3 attempts)
+            if not stack:
+                print(f"[RETRY] get_sale_data failed, trying get_offer_data...", flush=True)
+                
+                for attempt in range(3):
+                    print(f"[RETRY] get_offer_data attempt {attempt+1}/3", flush=True)
+                    stack = await run_get_method_http(source, 'get_offer_data')
+                    
+                    if stack is not None:
+                        print(f"[RETRY] ✅ get_offer_data succeeded on attempt {attempt+1}", flush=True)
+                        method_used = 'get_offer_data'
+                        break
+                    else:
+                        if attempt < 2:  # Don't wait after the last attempt
+                            print(f"[RETRY] ❌ get_offer_data failed, waiting 2s...", flush=True)
+                            await asyncio.sleep(2)  # Fixed 2 seconds wait
+                        else:
+                            print(f"[RETRY] ❌ get_offer_data failed on final attempt", flush=True)
+            
+            # FINAL CHECK
+            if not stack:
+                print(f"[RETRY] ❌ All 6 total attempts failed (3+3)", flush=True)
+                continue  # Skip this transaction
+            
+            print(f"[RETRY] ✅ Success with {method_used}! Stack has {len(stack)} items", flush=True)
+            # === END NEW CODE ===
+            
+            # Continue with existing parsing logic
+            converted_stack = parse_tonapi_stack(stack)
+            
+            from functions import parse_sale_stack
+            sale_data = parse_sale_stack(converted_stack)
+            
+            if not sale_data or not sale_data[1]:
+                continue
+            
+            nft_address = sale_data[4]
+            
                 
                 converted_stack = parse_tonapi_stack(stack)
                 
