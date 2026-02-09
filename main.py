@@ -206,7 +206,7 @@ async def royalty_trs(royalty_address):
         print(f"[royalty_trs] Fetching transactions for {royalty_address[-6:]}...", flush=True)
         try:
             transactions = await asyncio.wait_for(
-                get_transactions_http(royalty_address, limit=50),
+                get_transactions_http(royalty_address, limit=25),
                 timeout=20  # Max 20 seconds for transaction fetch
             )
         except asyncio.TimeoutError:
