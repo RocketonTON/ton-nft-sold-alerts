@@ -1,9 +1,9 @@
 from functions import convert_ton_to_usd
-from config import bot, markets, markets_links, getgems_user_url
+from config import application, markets, markets_links, getgems_user_url  # CAMBIA 'bot' in 'application'
 from secretData import notify_chat
 
 
-def tg_message(action, market_address, nft_address, prew_owner, real_owner, price_ton, nft_name, nft_preview, floor_ton, floor_link):
+async def tg_message(action, market_address, nft_address, prew_owner, real_owner, price_ton, nft_name, nft_preview, floor_ton, floor_link):  # AGGIUNGI 'async' qui
 
     emoji = ''
     tag = ''
@@ -14,16 +14,13 @@ def tg_message(action, market_address, nft_address, prew_owner, real_owner, pric
 
     if price_usd is not None:
         price_usd_text = f' (${price_usd})'
-
     else:
         price_usd_text = ''
 
     if floor_ton is not None:
         floor_usd = convert_ton_to_usd(floor_ton)
-
         if floor_usd is not None:
             floor_usd_text = f' (${floor_usd})'
-
         else:
             floor_usd_text = ''
 
@@ -32,11 +29,9 @@ def tg_message(action, market_address, nft_address, prew_owner, real_owner, pric
         if price_ton <= float(floor_ton) * 1.2:
             emoji = '🍣'
             tag = '#SushiLover'
-
         elif price_ton >= floor_ton * 2:
             emoji = '🔥'
             tag = '#WhaleHere'
-
     else:
         floor_text = ''
 
@@ -66,10 +61,22 @@ def tg_message(action, market_address, nft_address, prew_owner, real_owner, pric
                    f'<b><i>{action_tag} {tag}</i></b>'
 
     try:
-        bot.sendPhoto(notify_chat, photo=nft_preview, caption=message_text, parse_mode='HTML')
+        # CAMBIA QUESTA RIGA: bot.sendPhoto(...) -> await application.bot.send_photo(...)
+        await application.bot.send_photo(
+            chat_id=notify_chat,
+            photo=nft_preview,
+            caption=message_text,
+            parse_mode='HTML'
+        )
     except Exception as e:
         print(f'Photo Send ({notify_chat}) - ({nft_address}) Failed: {e}')
         try:
-            bot.sendMessage(notify_chat, message_text, parse_mode='HTML', disable_web_page_preview=True)
+            # CAMBIA QUESTA RIGA: bot.sendMessage(...) -> await application.bot.send_message(...)
+            await application.bot.send_message(
+                chat_id=notify_chat,
+                text=message_text,
+                parse_mode='HTML',
+                disable_web_page_preview=True
+            )
         except Exception as e:
             print(f'Message Send ({notify_chat}) - ({nft_address}) Failed: {e}')
