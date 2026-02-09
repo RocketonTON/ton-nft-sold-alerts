@@ -119,4 +119,3 @@ cmc_headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': cmc_token}
 print(f"[CONFIG DEBUG] Royalty addresses loaded: {len(royalty_addresses)}")
 print(f"[CONFIG DEBUG] Collections loaded: {len(collections_list)}")
 print(f"[CONFIG DEBUG] Telegram bot: {'✅ Inizializzato' if bot else '❌ Non inizializzato'}")
-print(f"[CONFIG DEBUG] TonAPI token: {'✅' if tonapi_token else '❌'}")f tonapi_token else '❌'}")
