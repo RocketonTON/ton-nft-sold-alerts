@@ -71,18 +71,6 @@ if toncenter_api_key:
 
 HTTP_TIMEOUT = aiohttp.ClientTimeout(total=20)
 
-# ... tutto il codice prima della classe rimane uguale ...
-
-# === TON CENTER API CONFIGURATION ===
-TONCENTER_HEADERS = {
-    "accept": "application/json",
-    "Content-Type": "application/json"
-}
-if toncenter_api_key:
-    TONCENTER_HEADERS["X-API-Key"] = toncenter_api_key
-
-HTTP_TIMEOUT = aiohttp.ClientTimeout(total=20)
-
 class TonCenterAPI:
     
     def __init__(self):
@@ -92,53 +80,53 @@ class TonCenterAPI:
         self.min_request_interval = TONCENTER_RATE_LIMIT
     
     async def get_transactions(self, address: str, limit: int = 10) -> list:
-    """Test both archival formats"""
-    
-    # Prova prima come stringa (per v2/v3)
-    archival_formats = ["true", True]
-    
-    for archival_value in archival_formats:
-        try:
-            print(f"[DEBUG] Testing archival={archival_value} (type: {type(archival_value).__name__})")
-            
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                url = f"{self.base_url}/getTransactions"
-                params = {
-                    "address": address,
-                    "limit": limit,
-                    "archival": archival_value,
-                }
+        """Test both archival formats"""
+        
+        # Prova prima come stringa (per v2/v3)
+        archival_formats = ["true", True]
+        
+        for archival_value in archival_formats:
+            try:
+                print(f"[DEBUG] Testing archival={archival_value} (type: {type(archival_value).__name__})")
                 
-                # DEBUG: mostra cosa stai inviando
-                import json
-                print(f"[DEBUG] Sending params: {json.dumps(params)}")
+                async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                    url = f"{self.base_url}/getTransactions"
+                    params = {
+                        "address": address,
+                        "limit": limit,
+                        "archival": archival_value,
+                    }
+                    
+                    # DEBUG: mostra cosa stai inviando
+                    import json
+                    print(f"[DEBUG] Sending params: {json.dumps(params)}")
+                    
+                    async with session.get(url, headers=self.headers, params=params) as response:
+                        
+                        print(f"[DEBUG] Response status: {response.status}")
+                        
+                        if response.status == 200:
+                            data = await response.json()
+                            txs = data.get("transactions", [])
+                            print(f"[TON Center] ✅ Success with archival={archival_value}! Got {len(txs)} transactions")
+                            return txs
+                        
+                        elif response.status == 400 or response.status == 500:
+                            error_text = await response.text()
+                            print(f"[DEBUG] Failed with archival={archival_value}: {error_text[:200]}")
+                            continue  # Prova il formato successivo
+                        
+                        else:
+                            error_text = await response.text()
+                            print(f"[TON Center] HTTP {response.status}: {error_text[:200]}")
+                            return []
                 
-                async with session.get(url, headers=self.headers, params=params) as response:
-                    
-                    print(f"[DEBUG] Response status: {response.status}")
-                    
-                    if response.status == 200:
-                        data = await response.json()
-                        txs = data.get("transactions", [])
-                        print(f"[TON Center] ✅ Success with archival={archival_value}! Got {len(txs)} transactions")
-                        return txs
-                    
-                    elif response.status == 400 or response.status == 500:
-                        error_text = await response.text()
-                        print(f"[DEBUG] Failed with archival={archival_value}: {error_text[:200]}")
-                        continue  # Prova il formato successivo
-                    
-                    else:
-                        error_text = await response.text()
-                        print(f"[TON Center] HTTP {response.status}: {error_text[:200]}")
-                        return []
-            
-        except Exception as e:
-            print(f"[DEBUG] Error with archival={archival_value}: {e}")
-            continue
-    
-    print(f"[TON Center] ❌ All archival formats failed")
-    return []
+            except Exception as e:
+                print(f"[DEBUG] Error with archival={archival_value}: {e}")
+                continue
+        
+        print(f"[TON Center] ❌ All archival formats failed")
+        return []
     
     async def run_get_method(self, address: str, method: str, stack: list = None) -> list:
         """Execute a get method on a smart contract"""
@@ -196,11 +184,12 @@ class TonCenterAPI:
         
         return None, None
 
-# ========== QUESTA RIGA DEVE ESSERE FUORI DALLA CLASSE ==========
-# Global API instance - DOPO la chiusura della classe
+# Global API instance
 toncenter_api = TonCenterAPI()
 
-# ... il resto del tuo codice (read_last_utime, royalty_trs, ecc.) rimane uguale ...
+# Debug verification
+print("[DEBUG] ✅ TonCenterAPI class structure verified")
+print(f"[DEBUG] Methods available: {[m for m in dir(toncenter_api) if not m.startswith('_')]}")
 
 def read_last_utime() -> int:
     """Read last processed timestamp"""
@@ -235,22 +224,16 @@ async def royalty_trs(royalty_address: str):
         
         print(f"[royalty_trs] Found {len(transactions)} transactions for {royalty_address[-6:]}", flush=True)
         
-        # Debug info
-        if transactions:
-            print(f"[DEBUG] First tx utime: {transactions[0].get('utime', 'N/A')}", flush=True)
-            print(f"[DEBUG] Last tx utime: {transactions[-1].get('utime', 'N/A')}", flush=True)
-        
         latest_utime = last_utime
         processed_count = 0
         
-        # 3. PROCESS TRANSACTIONS (from newest to oldest)
+        # 3. PROCESS TRANSACTIONS
         for tx in transactions:
             tx_time = tx.get("utime", 0)
             
             if tx_time <= last_utime:
                 continue
             
-            # Update latest utime
             if tx_time > latest_utime:
                 latest_utime = tx_time
             
@@ -262,7 +245,6 @@ async def royalty_trs(royalty_address: str):
             
             print(f"[royalty_trs] Processing transaction from {source[-6:]} (utime: {tx_time})", flush=True)
             
-            # GET SALE DATA WITH RETRY
             stack, method_used = await toncenter_api.get_sale_data_with_retry(source)
             
             if not stack:
@@ -271,7 +253,6 @@ async def royalty_trs(royalty_address: str):
             
             print(f"[royalty_trs] ✅ Success with {method_used}! Stack has {len(stack)} items", flush=True)
             
-            # PARSE SALE DATA
             sale_data = parse_sale_stack(stack)
             
             if not sale_data or not sale_data[1]:
@@ -283,7 +264,6 @@ async def royalty_trs(royalty_address: str):
             if not nft_address:
                 continue
             
-            # GET NFT DATA
             print(f"[royalty_trs] Fetching NFT data for {nft_address[-6:]}...", flush=True)
             nft_data = await get_nft_data(nft_address)
             
@@ -291,7 +271,6 @@ async def royalty_trs(royalty_address: str):
                 print(f"[royalty_trs] ❌ NFT data not found for {nft_address[-6:]}", flush=True)
                 continue
             
-            # CHECK COLLECTION
             collection_address = nft_data[1]
             if collection_address not in collections_list:
                 print(f"[royalty_trs] ❌ Collection {collection_address[-6:]} not monitored", flush=True)
@@ -299,12 +278,10 @@ async def royalty_trs(royalty_address: str):
             
             print(f"[royalty_trs] ✅ Collection {collection_address[-6:]} is monitored!", flush=True)
             
-            # GET FLOOR PRICE
             print(f"[royalty_trs] Fetching floor for collection {collection_address[-6:]}...", flush=True)
             floor_data = await get_collection_floor(collection_address)
             floor_price, floor_link = floor_data
             
-            # SEND TELEGRAM NOTIFICATION
             try:
                 if sale_data[0] == 'SaleFixPrice':
                     price = sale_data[6] if len(sale_data) > 6 else 0
@@ -364,14 +341,12 @@ async def scheduler():
             try:
                 print(f"\n[CYCLE #{cycle_count}] Start at {time.strftime('%H:%M:%S')}", flush=True)
                 
-                # Process all royalty addresses
                 results = []
                 for addr in royalty_addresses:
                     result = await royalty_trs(addr)
                     if result:
                         results.append(result)
                 
-                # Update lastUtime if new transactions found
                 if results:
                     last_utime = max(results)
                     write_last_utime(last_utime)
@@ -379,10 +354,9 @@ async def scheduler():
                 
                 print(f"[CYCLE #{cycle_count}] Finished. Sleeping 180s (3min)...", flush=True)
                 
-                # Sleep with heartbeat
                 for i in range(6):
                     await asyncio.sleep(30)
-                    minutes = (i + 1) * 0.5  # 0.5, 1.0, 1.5, 2.0, 2.5, 3.0 min
+                    minutes = (i + 1) * 0.5
                     print(f"[HEARTBEAT] {minutes}min / 3min", flush=True)
                     
             except Exception as cycle_error:
@@ -400,16 +374,13 @@ async def main():
     """Main async entry point"""
     print("\n[MAIN] TON NFT Bot starting (TON Center)...", flush=True)
     
-    # Start web server in background (for Render)
     try:
         run_in_background()
         print("[MAIN] ✅ Web server started", flush=True)
-        await asyncio.sleep(2)  # Let web server start
+        await asyncio.sleep(2)
     except Exception as e:
         print(f"[MAIN] ⚠️ Web server failed: {e}", flush=True)
-        # Continue without web server
     
-    # Start main scheduler
     try:
         await scheduler()
     except KeyboardInterrupt:
