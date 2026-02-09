@@ -92,37 +92,53 @@ class TonCenterAPI:
         self.min_request_interval = TONCENTER_RATE_LIMIT
     
     async def get_transactions(self, address: str, limit: int = 10) -> list:
-        """Fetch transactions for an address"""
+    """Test both archival formats"""
+    
+    # Prova prima come stringa (per v2/v3)
+    archival_formats = ["true", True]
+    
+    for archival_value in archival_formats:
         try:
+            print(f"[DEBUG] Testing archival={archival_value} (type: {type(archival_value).__name__})")
+            
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 url = f"{self.base_url}/getTransactions"
                 params = {
                     "address": address,
                     "limit": limit,
-                    "archival": True,
+                    "archival": archival_value,
                 }
                 
-                # STESSO LIVELLO DI "params = {" (12 spazi)
+                # DEBUG: mostra cosa stai inviando
+                import json
+                print(f"[DEBUG] Sending params: {json.dumps(params)}")
+                
                 async with session.get(url, headers=self.headers, params=params) as response:
                     
-                    if response.status == 429:
-                        print(f"[TON Center] ⛔ Rate limit exceeded for {address[-6:]}", flush=True)
-                        return []
+                    print(f"[DEBUG] Response status: {response.status}")
                     
-                    if response.status != 200:
-                        print(f"[TON Center] HTTP {response.status} for {address[-6:]}", flush=True)
-                        return []
+                    if response.status == 200:
+                        data = await response.json()
+                        txs = data.get("transactions", [])
+                        print(f"[TON Center] ✅ Success with archival={archival_value}! Got {len(txs)} transactions")
+                        return txs
                     
-                    data = await response.json()
-                    return data.get("transactions", [])
-        
-        # "except" DEVE ESSERE FUORI DAL "async with session:", ALLO STESSO LIVELLO DI "try:"
-        except asyncio.TimeoutError:
-            print(f"[TON Center] Timeout for {address[-6:]}", flush=True)
-            return []
+                    elif response.status == 400 or response.status == 500:
+                        error_text = await response.text()
+                        print(f"[DEBUG] Failed with archival={archival_value}: {error_text[:200]}")
+                        continue  # Prova il formato successivo
+                    
+                    else:
+                        error_text = await response.text()
+                        print(f"[TON Center] HTTP {response.status}: {error_text[:200]}")
+                        return []
+            
         except Exception as e:
-            print(f"[TON Center] Error for {address[-6:]}: {e}", flush=True)
-            return []
+            print(f"[DEBUG] Error with archival={archival_value}: {e}")
+            continue
+    
+    print(f"[TON Center] ❌ All archival formats failed")
+    return []
     
     async def run_get_method(self, address: str, method: str, stack: list = None) -> list:
         """Execute a get method on a smart contract"""
