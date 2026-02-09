@@ -1,5 +1,6 @@
 import requests
 import asyncio
+import sys
 
 from pathlib import Path
 from pytonlib import TonlibClient
@@ -8,6 +9,8 @@ from config import current_path, ton_config_url, royalty_addresses, get_methods,
 from functions import parse_sale_stack
 from nftData import get_nft_data, get_collection_floor
 from tgMessage import tg_message
+
+sys.modules['crc16'] = sys.modules[__name__]
 
 
 async def get_client():
