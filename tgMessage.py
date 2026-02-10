@@ -128,3 +128,29 @@ def tg_message(action, market_address, nft_address, prew_owner,
         real_owner, price_ton, nft_name, nft_preview,
         floor_ton, floor_link
     ))
+
+
+# Aggiungere alla fine di tgMessage.py
+async def send_telegram_message(text: str, chat_id: str = None, parse_mode: str = "Markdown", 
+                                reply_to_message_id: str = None):
+    """Send a simple text message to Telegram"""
+    try:
+        if not tg_notifier.bot:
+            print("❌ Telegram bot not initialized")
+            return False
+        
+        if not chat_id:
+            chat_id = notify_chat  # Usa il chat_id da secretData
+        
+        await tg_notifier.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=parse_mode,
+            reply_to_message_id=reply_to_message_id,
+            disable_web_page_preview=True
+        )
+        print(f"✅ Telegram message sent to {chat_id}")
+        return True
+    except Exception as e:
+        print(f"❌ Error sending telegram message: {e}")
+        return False
