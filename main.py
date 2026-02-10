@@ -25,7 +25,7 @@ except Exception as e:
 
 try:
     from config import current_path, royalty_addresses, collections_list
-    from secretData import toncenter_api_key, bot_token, notify_chat
+    from secretData import toncenter_api_key, bot_token as telegram_bot_token, notify_chat as telegram_chat_id
     print("[DEBUG] ✅ config imported", flush=True)
     print(f"[DEBUG] royalty_addresses: {len(royalty_addresses)}", flush=True)
     print(f"[DEBUG] collections_list: {len(collections_list)}", flush=True)
