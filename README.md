@@ -68,7 +68,7 @@ Set these in Render Dashboard → Environment:
 |----------|-------------|----------|
 | `BOT_TOKEN` | Telegram bot token from @BotFather | ✅ Yes |
 | `NOTIFY_CHAT` | Your Telegram chat ID | ✅ Yes |
-| `TONAPI_TOKEN` | API token from tonapi.io | ✅ Yes |
+| `TONCENTER_API_KEY` | API token from toncenter.com | ✅ Yes |
 | `CMC_TOKEN` | CoinMarketCap API key | ❌ Optional |
 
 ### Build & Start Commands
@@ -167,7 +167,7 @@ Check environment variables:
 ```bash
 echo $BOT_TOKEN
 echo $NOTIFY_CHAT
-echo $TONAPI_TOKEN
+echo $TONCENTER_API_KEY
 ```
 
 ### No Notifications
@@ -211,8 +211,8 @@ The bot provides detailed logging:
 
 - **Language:** Python 3.10+
 - **Async:** asyncio with non-blocking I/O
-- **Blockchain:** TonAPI REST API
-- **Bot Framework:** telepot
+- **Blockchain:** TON Center REST API
+- **Bot Framework:** python-telegram-bot
 - **HTTP:** requests library
 - **Hosting:** Render-ready with health checks
 
