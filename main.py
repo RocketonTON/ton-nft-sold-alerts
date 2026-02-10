@@ -642,16 +642,7 @@ async def telegram_polling_handler():
                                         if text.startswith("/"):
                                             print(f"[TELEGRAM] Received command: {text} from chat {chat_id}", flush=True)
                                             await handle_telegram_command(text, chat_id, message_id)
-                                        else:
-                                            # Not a command, send help
-                                            help_msg = "🤖 *TON NFT Sales Bot*\n\n"
-                                            help_msg += "I only understand commands. Type /help to see all available commands.\n\n"
-                                            help_msg += "Example commands:\n"
-                                            help_msg += "• /status - Check bot status\n"
-                                            help_msg += "• /example - See example notification\n"
-                                            help_msg += "• /collections - List monitored collections"
-                                            
-                                            await send_telegram_message(help_msg, chat_id=chat_id, reply_to_message_id=message_id)
+                                        
                 
                 # Small delay between polling
                 await asyncio.sleep(1)
