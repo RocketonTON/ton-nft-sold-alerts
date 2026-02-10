@@ -14,10 +14,10 @@ TONCENTER_RATE_LIMIT = 1  # secondi tra le richieste
 trs_limit = 25
 
 # Royalty addresses to monitor
-royalty_addresses = ['EQBo86B200UaGP1B4FxxtMAgVF1GsnVwZOZYJd7QxJvwLHL0']
+royalty_addresses = ['0:68F3A076D3451A18FD41E05C71B4C020545D46B2757064E65825DED0C49BF02C']
 
 # NFT collections to track
-collections_list = ['EQA4i58iuS9DUYRtUZ97sZo5mnkbiYUBpWXQOe3dEUCcP1W8']
+collections_list = ['0:388b9f22b92f4351846d519f7bb19a399a791b898501a565d039eddd11409c3f']
 
 # === MARKETPLACES ===
 markets = {
