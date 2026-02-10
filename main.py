@@ -569,11 +569,7 @@ async def handle_telegram_command(command: str, chat_id: str, message_id: str = 
             message += f"🕒 Current time: {time.strftime('%H:%M:%S UTC')}\n"
             message += "🎯 Ready to monitor NFT sales!"
             
-        else:
-            message = "❌ *Unknown command*\n\n"
-            message += "Type /help to see all available commands."
         
-        # Send the response message
         await send_telegram_message(message, chat_id=chat_id, reply_to_message_id=message_id)
         print(f"[TELEGRAM] Command response sent for: {command}", flush=True)
         
