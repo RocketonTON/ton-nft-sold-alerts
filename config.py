@@ -13,15 +13,28 @@ TONCENTER_RATE_LIMIT = 1  # secondi tra le richieste
 # === BOT CONFIGURATION ===
 trs_limit = 25
 
-# Royalty addresses to monitor
-royalty_addresses = ['0:68F3A076D3451A18FD41E05C71B4C020545D46B2757064E65825DED0C49BF02C']
+# Royalty addresses to monitor - FORMATO RAW (0:...) MAIUSCOLO
+royalty_addresses = [
+    '0:68F3A076D3451A18FD41E05C71B4C020545D46B2757064E65825DED0C49BF02C',
+    '0:A3935861F79DAF59A13D6D182E1640210C02F98E3DF18FDA74B8F5AB141ABF18'
+]
 
-# NFT collections to track
-collections_list = ['0:388b9f22b92f4351846d519f7bb19a399a791b898501a565d039eddd11409c3f']
+# NFT collections to track - FORMATO RAW (0:...) MAIUSCOLO
+collections_list = [
+    '0:388B9F22B92F4351846D519F7BB19A399A791B898501A565D039EDDD11409C3F'
+]
 
 # === MARKETPLACES ===
+# NOTA: I marketplace possono avere DUE formati:
+# 1. Indirizzi EQ per link web (nelle markets_links)
+# 2. Indirizzi RAW dei contratti di vendita per la logica interna (se necessario)
 markets = {
-    'EQBYTuYbLf8INxFtD8tQeNk5ZLy-nAX9ahQbG_yl1qQ-GEMS': 'Getgems',
+    # Contratti marketplace in formato RAW (se usati per logica)
+    '0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18': 'Getgems',
+    '0:83CBEFE239C49E33F863BB4D6127E6E3056CBAA155D1F83CEF675B146D747F17': 'Getgems',  # Altro contratto Getgems
+    '0:6F00F7A3618D3063DCF5E783CBC9DBD87D634161FBBE1B7A97F7D94BB3BD583C': 'Disintar',
+    
+    # Indirizzi EQ per compatibilità (usati principalmente per display)
     'EQCjc483caXMwWw2kwl2afFquAPO0LX1VyZbnZUs3toMYkk9': 'Getgems',
     'EQCgRvXbOJeFSRKnEg1D-i0SqDMlaNVGvpSSKCzDQU_wDAR4': 'Tonex',
     'EQDrLq-X6jKZNHAScgghh0h1iog3StK71zn8dcmrOj8jPWRA': 'Disintar',
@@ -61,10 +74,35 @@ query nftSearch($count: Int!, $cursor: String, $query: String, $sort: String) {
 # GET methods to try
 get_methods = ['get_sale_data', 'get_offer_data']
 
-# Aggiungi queste righe alla fine di config.py, PRIMA dell'ultima riga:
-
-# CoinMarketCap headers
+# CoinMarketCap headers (sarà popolata dinamicamente da secretData.cmc_token)
 cmc_headers = {
     'Accepts': 'application/json',
     'X-CMC_PRO_API_KEY': ''  # Sarà popolata dinamicamente da secretData.cmc_token
 }
+
+# === DEBUG/UTILITY ===
+def verify_addresses():
+    """Verifica che tutti gli indirizzi siano nel formato corretto"""
+    print("\n[CONFIG] Verifica indirizzi:")
+    
+    # Verifica royalty_addresses
+    print(f"  Royalty addresses ({len(royalty_addresses)}):")
+    for i, addr in enumerate(royalty_addresses):
+        valid = (addr.startswith('0:') and len(addr) == 67 and 
+                 addr[2:].isupper() and all(c in '0123456789ABCDEF' for c in addr[2:]))
+        status = "✅" if valid else "❌"
+        print(f"    [{i}] {status} {addr[:30]}...")
+    
+    # Verifica collections_list
+    print(f"  Collections ({len(collections_list)}):")
+    for i, addr in enumerate(collections_list):
+        valid = (addr.startswith('0:') and len(addr) == 67 and 
+                 addr[2:].isupper() and all(c in '0123456789ABCDEF' for c in addr[2:]))
+        status = "✅" if valid else "❌"
+        print(f"    [{i}] {status} {addr[:30]}...")
+    
+    return True
+
+# Esegui verifica all'importazione
+if __name__ != "__main__":
+    verify_addresses()
