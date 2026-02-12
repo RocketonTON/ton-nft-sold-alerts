@@ -72,21 +72,13 @@ class TelegramNotifier:
                           f'{seller_text}'
                           f'<b><i>{action_tag} {tag}</i></b>')
             
-            # Send message
-            if nft_preview:
-                await self.bot.send_photo(
-                    chat_id=notify_chat,
-                    photo=nft_preview,
-                    caption=message_text,
-                    parse_mode=ParseMode.HTML
-                )
-            else:
-                await self.bot.send_message(
-                    chat_id=notify_chat,
-                    text=message_text,
-                    parse_mode=ParseMode.HTML,
-                    disable_web_page_preview=True
-                )
+            # ✅ INVIA CON send_telegram_message (UNICO PUNTO DI INVIO!)
+            await send_telegram_message(
+                text=message_text,
+                photo=nft_preview,
+                parse_mode='HTML',
+                disable_web_page_preview=not bool(nft_preview)
+            )
             
             print(f"✅ Telegram notification sent: {nft_name}")
             
@@ -96,10 +88,10 @@ class TelegramNotifier:
             try:
                 if nft_preview:
                     simple_text = f"{nft_name} sold for {price_ton} TON"
-                    await self.bot.send_message(
-                        chat_id=notify_chat,
+                    await send_telegram_message(
                         text=simple_text,
-                        parse_mode=ParseMode.HTML
+                        parse_mode='HTML',
+                        disable_web_page_preview=True
                     )
             except Exception as e2:
                 print(f"❌ Fallback also failed: {e2}")
@@ -129,26 +121,34 @@ def tg_message(action, market_address, nft_address, prew_owner,
         floor_ton, floor_link
     ))
 
-
-# Aggiungere alla fine di tgMessage.py
-async def send_telegram_message(text: str, chat_id: str = None, parse_mode: str = "Markdown", 
-                                reply_to_message_id: str = None):
-    """Send a simple text message to Telegram"""
+async def send_telegram_message(text: str, chat_id: str = None, photo=None, 
+                               parse_mode: str = "HTML", disable_web_page_preview: bool = False,
+                               reply_to_message_id: str = None):
+    """UNICA funzione che invia messaggi a Telegram"""
     try:
         if not tg_notifier.bot:
             print("❌ Telegram bot not initialized")
             return False
         
         if not chat_id:
-            chat_id = notify_chat  # Usa il chat_id da secretData
+            chat_id = notify_chat
         
-        await tg_notifier.bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            parse_mode=parse_mode,
-            reply_to_message_id=reply_to_message_id,
-            disable_web_page_preview=True
-        )
+        if photo:
+            await tg_notifier.bot.send_photo(
+                chat_id=chat_id,
+                photo=photo,
+                caption=text,
+                parse_mode=parse_mode,
+                reply_to_message_id=reply_to_message_id
+            )
+        else:
+            await tg_notifier.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                parse_mode=parse_mode,
+                reply_to_message_id=reply_to_message_id,
+                disable_web_page_preview=disable_web_page_preview
+            )
         print(f"✅ Telegram message sent to {chat_id}")
         return True
     except Exception as e:
