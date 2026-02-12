@@ -3,6 +3,7 @@ import aiohttp
 import asyncio
 import base64
 import json
+import re
 from typing import Optional, Dict, Any, Tuple
 from secretData import cmc_token
 from config import tonorg_price_url, cmc_url, cmc_headers
@@ -256,3 +257,74 @@ def parse_offer_stack(stack: list) -> Optional[tuple]:
     except Exception as e:
         print(f'[parse_offer_stack] Error: {e}')
         return None
+
+# ============= FUNZIONI PER RECUPERARE NFT ADDRESS =============
+
+async def get_nft_from_sale_contract(sale_address: str) -> Optional[str]:
+    """
+    Recupera NFT address da un contratto di vendita usando TON Center API v3
+    """
+    try:
+        # Usa l'endpoint ufficiale nft/transfers
+        url = "https://toncenter.com/api/v3/nft/transfers"
+        params = {
+            "sale_contract_address": sale_address,
+            "limit": 1
+        }
+        
+        headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    transfers = data.get('nft_transfers', [])
+                    if transfers:
+                        nft_address = transfers[0].get('nft_address')
+                        if nft_address:
+                            print(f"[get_nft] ✅ Trovato via nft/transfers: {nft_address[-12:]}")
+                            return nft_address
+    except Exception as e:
+        print(f"[get_nft] Error: {e}")
+    
+    return None
+
+def extract_nft_from_comment(tx: dict) -> Optional[str]:
+    """
+    Estrae NFT address dal commento della transazione
+    """
+    try:
+        in_msg = tx.get('in_msg', {})
+        message_content = in_msg.get('message_content', {})
+        decoded = message_content.get('decoded', {})
+        
+        # Getgems, Disintar, Tonex mettono NFT address nel commento!
+        nft_address = decoded.get('comment')
+        
+        if nft_address and isinstance(nft_address, str):
+            # Pulisci l'indirizzo se necessario
+            if nft_address.startswith('EQ') or nft_address.startswith('UQ'):
+                # Converti in formato raw se serve
+                pass
+            elif nft_address.startswith('0:'):
+                print(f"[get_nft] ✅ Trovato nel commento: {nft_address[-12:]}")
+                return nft_address
+        
+        # Cerca nel body come fallback
+        body = message_content.get('body', '')
+        match = re.search(r'0:[0-9A-F]{64}', body)
+        if match:
+            nft_address = match.group(0)
+            print(f"[get_nft] ✅ Trovato nel body: {nft_address[-12:]}")
+            return nft_address
+            
+    except Exception as e:
+        print(f"[get_nft] Error extracting comment: {e}")
+    
+    return None
+
+# Alias per retrocompatibilità
+parse_address_from_cell_v3 = parse_address_from_cell
