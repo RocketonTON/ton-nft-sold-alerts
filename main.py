@@ -710,7 +710,7 @@ async def royalty_trs(royalty_address: str):
                 continue
             print(f"[DEBUG] ✅ TX is newer than last_utime")
             
-            # FILTRO 2: SOURCE ADDRESS (ADATTATO ALLA REALTÀ V3)
+                        # FILTRO 2: SOURCE ADDRESS (ADATTATO ALLA REALTÀ V3)
             in_msg = tx.get('in_msg', {})
             if not isinstance(in_msg, dict):
                 print(f"[DEBUG] ❌ in_msg not dict: {type(in_msg)}")
@@ -731,13 +731,9 @@ async def royalty_trs(royalty_address: str):
             tx_value = int(in_msg.get('value', 0)) / 1e9
             print(f"[DEBUG] Transaction value: {tx_value:.4f} TON")
             
-            # Pulisci indirizzo raw
-            original_source = source_address
-            if isinstance(source_address, str) and source_address.startswith('0:'):
-                source_address = source_address[2:]
-                print(f"[DEBUG] Cleaned source address: {original_source} → {source_address}")
-            
-            print(f"[DEBUG] ✅ Source address: {source_address[-12:] if len(source_address) > 12 else source_address}")
+            # ✅ INDIRIZZO MANTENUTO INTATTO - NESSUNA PULIZIA!
+            print(f"[DEBUG] ✅ Source address (full): {source_address}")
+            print(f"[DEBUG] ✅ Source address (last 12): {source_address[-12:] if len(source_address) > 12 else source_address}")
             
             # FILTRO 3: GET SALE DATA (come pytonlib, con tutti i metodi)
             stack = None
