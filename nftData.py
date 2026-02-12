@@ -101,7 +101,7 @@ async def get_nft_data_via_getmethod(nft_address: str) -> Optional[tuple]:
                 
                 data = await response.json()
                 
-                # ✅ GESTIONE FORMATI API v3
+                # GESTIONE FORMATI API v3
                 stack = None
                 if "ok" in data and data.get("ok") and "result" in data:
                     stack = data["result"].get("stack", [])
@@ -115,11 +115,11 @@ async def get_nft_data_via_getmethod(nft_address: str) -> Optional[tuple]:
                 if not stack or len(stack) < 5:
                     return None
                 
-                # ✅ FUNZIONE PER CONVERTIRE DICT IN INT
+                # ✅ FUNZIONE CHE GESTISCE I DICT!
                 def get_int_from_stack_item(item):
                     """Estrae intero da stack item (dict, list, string)"""
                     try:
-                        # CASO 1: Dict API v3
+                        # CASO 1: Dict API v3 - IL TUO CASO!
                         if isinstance(item, dict):
                             if 'value' in item:
                                 val = item['value']
@@ -147,30 +147,38 @@ async def get_nft_data_via_getmethod(nft_address: str) -> Optional[tuple]:
                                 return int(val, 16)
                             except:
                                 return 0
-                    except:
+                    except Exception as e:
+                        print(f"[nftData] get_int error: {e}")
                         return 0
                 
                 # ✅ FUNZIONE PER PARSARE INDIRIZZI
                 def get_address_from_stack_item(item):
                     """Estrae indirizzo da stack item"""
                     try:
-                        # Usa la funzione esistente da functions.py
-                        from functions import parse_address_from_cell
-                        return parse_address_from_cell(item)
+                        # Prova a importare la funzione da functions
+                        try:
+                            from functions import parse_address_from_cell
+                            addr = parse_address_from_cell(item)
+                            if addr:
+                                return addr
+                        except:
+                            pass
+                        
+                        # Fallback per dict API v3
+                        if isinstance(item, dict):
+                            if item.get('type') == 'cell':
+                                cell_boc = item.get('cell', '')
+                                if cell_boc:
+                                    return f"0:{cell_boc[:64]}"
+                        return None
                     except:
-                        # Fallback
-                        if isinstance(item, dict) and 'cell' in item:
-                            return f"0:{item['cell'][:64]}"
                         return None
                 
-                # Estrai init (bool)
+                # ✅ ORA USA LE FUNZIONI - NESSUN int(stack[0]) DIRETTO!
                 init_val = get_int_from_stack_item(stack[0])
                 init = bool(init_val)
                 
-                # Estrai collection address (indice 2)
                 collection_address = get_address_from_stack_item(stack[2])
-                
-                # Estrai owner address (indice 3)
                 owner_address = get_address_from_stack_item(stack[3])
                 
                 # Ottieni metadata esterni
