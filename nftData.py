@@ -86,87 +86,100 @@ async def get_nft_data_via_getmethod(nft_address: str) -> Optional[tuple]:
         print(f"[nftData] Trying runGetMethod for {nft_address[-8:]}")
         
         async with aiohttp.ClientSession() as session:
-            # ✅ FORMATO CORRETTO per API v3 runGetMethod
             url = f"{TONCENTER_API}/runGetMethod"
             payload = {
-                "address": nft_address,  # ✅ "address" è corretto per runGetMethod!
+                "address": nft_address,
                 "method": "get_nft_data",
                 "stack": []
             }
             
-            print(f"[nftData] runGetMethod payload: {json.dumps(payload, indent=2)[:200]}...")
-            
             async with session.post(url, headers=TONCENTER_HEADERS, 
                                   json=payload, timeout=15) as response:
                 
-                status = response.status
-                print(f"[nftData] runGetMethod status: {status}")
-                
-                if status == 200:
-                    data = await response.json()
-                    print(f"[nftData] runGetMethod response keys: {list(data.keys())}")
-                    
-                    # ✅ GESTISCE ENTRAMBI I FORMATI (v3 e legacy)
-                    if "ok" in data:
-                        # Formato v3: {"ok": true, "result": {"stack": [...]}}
-                        if data.get("ok") and "result" in data:
-                            stack = data["result"].get("stack", [])
-                            print(f"[nftData] ✅ runGetMethod v3 format, stack size: {len(stack)}")
-                        else:
-                            print(f"[nftData] ❌ runGetMethod v3 format failed")
-                            return None
-                    elif "success" in data:
-                        # Formato legacy v2
-                        if data.get("success", False):
-                            stack = data.get("stack", [])
-                            print(f"[nftData] ✅ runGetMethod legacy format, stack size: {len(stack)}")
-                        else:
-                            print(f"[nftData] ❌ runGetMethod legacy format failed")
-                            return None
-                    elif "stack" in data:
-                        stack = data.get("stack", [])
-                        print(f"[nftData] ✅ runGetMethod direct stack, size: {len(stack)}")
-                    else:
-                        print(f"[nftData] ❌ Unknown runGetMethod format")
-                        return None
-                    
-                    # DEBUG: mostra struttura stack
-                    print(f"[nftData] Stack structure (first 5 items):")
-                    for i, item in enumerate(stack[:5]):
-                        print(f"  [{i}] type: {type(item)}, value: {str(item)[:80]}")
-                    
-                    # Parse dello stack
-                    if len(stack) >= 5:
-                        # Stack format: [init, index, collection_addr, owner_addr, content]
-                        try:
-                            init = bool(int(str(stack[0]), 16) if isinstance(stack[0], str) and stack[0].startswith('0x') else int(stack[0]))
-                            
-                            # Estrai indirizzi REALI dallo stack
-                            collection_address = parse_real_address_from_stack_item(stack[2])
-                            owner_address = parse_real_address_from_stack_item(stack[3])
-                            
-                            print(f"[nftData] Parsed from stack:")
-                            print(f"  init: {init}")
-                            print(f"  collection: {collection_address[-8:] if collection_address else 'None'}")
-                            print(f"  owner: {owner_address[-8:] if owner_address else 'None'}")
-                            
-                            # Ottieni metadata esterni
-                            nft_name, nft_image = await get_nft_metadata_external(nft_address)
-                            
-                            return (init, collection_address, owner_address, 
-                                    nft_name or f"NFT {nft_address[-8:]}", nft_image or '')
-                            
-                        except Exception as parse_error:
-                            print(f"[nftData] ❌ Error parsing stack: {parse_error}")
-                            return None
-                    
-                    print(f"[nftData] ❌ Stack too small: {len(stack)} items")
+                if response.status != 200:
                     return None
                 
+                data = await response.json()
+                
+                # ✅ GESTIONE FORMATI API v3
+                stack = None
+                if "ok" in data and data.get("ok") and "result" in data:
+                    stack = data["result"].get("stack", [])
+                elif "success" in data and data.get("success"):
+                    stack = data.get("stack", [])
+                elif "stack" in data:
+                    stack = data.get("stack", [])
                 else:
-                    error_text = await response.text()
-                    print(f'[nftData] runGetMethod error {status}: {error_text[:200]}')
                     return None
+                
+                if not stack or len(stack) < 5:
+                    return None
+                
+                # ✅ FUNZIONE PER CONVERTIRE DICT IN INT
+                def get_int_from_stack_item(item):
+                    """Estrae intero da stack item (dict, list, string)"""
+                    try:
+                        # CASO 1: Dict API v3
+                        if isinstance(item, dict):
+                            if 'value' in item:
+                                val = item['value']
+                            elif 'num' in item:
+                                val = item['num']
+                            else:
+                                return 0
+                        # CASO 2: List pytonlib
+                        elif isinstance(item, list) and len(item) > 1:
+                            val = item[1]
+                        # CASO 3: Stringa
+                        elif isinstance(item, str):
+                            val = item
+                        else:
+                            return 0
+                        
+                        # Converti in intero
+                        val = str(val).strip()
+                        if val.startswith('0x'):
+                            return int(val, 16)
+                        elif val.isdigit():
+                            return int(val)
+                        else:
+                            try:
+                                return int(val, 16)
+                            except:
+                                return 0
+                    except:
+                        return 0
+                
+                # ✅ FUNZIONE PER PARSARE INDIRIZZI
+                def get_address_from_stack_item(item):
+                    """Estrae indirizzo da stack item"""
+                    try:
+                        # Usa la funzione esistente da functions.py
+                        from functions import parse_address_from_cell
+                        return parse_address_from_cell(item)
+                    except:
+                        # Fallback
+                        if isinstance(item, dict) and 'cell' in item:
+                            return f"0:{item['cell'][:64]}"
+                        return None
+                
+                # Estrai init (bool)
+                init_val = get_int_from_stack_item(stack[0])
+                init = bool(init_val)
+                
+                # Estrai collection address (indice 2)
+                collection_address = get_address_from_stack_item(stack[2])
+                
+                # Estrai owner address (indice 3)
+                owner_address = get_address_from_stack_item(stack[3])
+                
+                # Ottieni metadata esterni
+                nft_name, nft_image = await get_nft_metadata_external(nft_address)
+                
+                return (init, collection_address, owner_address, 
+                        nft_name or f"NFT {nft_address[-8:]}", nft_image or '')
+        
+        return None
         
     except Exception as e:
         print(f'[nftData] Error in get_nft_data_via_getmethod: {e}')
