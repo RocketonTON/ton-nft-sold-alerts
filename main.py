@@ -746,24 +746,64 @@ async def royalty_trs(royalty_address: str):
             if tx_time <= last_utime:
                 stats["already_processed"] += 1
                 continue
-            
-            # NUOVA TRANSAZIONE
+
+
+                    # NUOVA TRANSAZIONE
             stats["new_transactions"] += 1
             
             if tx_time > latest_utime:
                 latest_utime = tx_time
             
             in_msg = safe_tx_get(tx, "in_msg", {})
-            source = safe_tx_get(in_msg, "source", {})
-            source_address = safe_tx_get(source, "address") if isinstance(source, dict) else None
+            source_address = None
+            
+            # Strategie multiple per trovare il source address
+            if isinstance(in_msg, dict):
+                # Strategia 1: source come stringa diretta (API v3)
+                if "source" in in_msg:
+                    if isinstance(in_msg["source"], str):
+                        source_address = in_msg["source"]
+                        print(f"[DEBUG] ✅ Source from string: {source_address[-8:]}")
+                    elif isinstance(in_msg["source"], dict):
+                        source_address = in_msg["source"].get("address")
+                        if source_address:
+                            print(f"[DEBUG] ✅ Source from dict: {source_address[-8:]}")
+                
+                # Strategia 2: cerca in campi alternativi
+                if not source_address:
+                    for alt_key in ['src', 'from', 'sender']:
+                        if alt_key in in_msg:
+                            if isinstance(in_msg[alt_key], str):
+                                source_address = in_msg[alt_key]
+                                print(f"[DEBUG] ✅ Source from '{alt_key}': {source_address[-8:]}")
+                                break
+                            elif isinstance(in_msg[alt_key], dict):
+                                source_address = in_msg[alt_key].get("address")
+                                if source_address:
+                                    print(f"[DEBUG] ✅ Source from '{alt_key}'.address: {source_address[-8:]}")
+                                    break
             
             # FILTRO 2: SOURCE ADDRESS
             if not source_address:
                 stats["new_no_source"] += 1
-                print(f"[DEBUG] ⚠️ New transaction {tx_time} has NO source address", flush=True)
+                print(f"[DEBUG] ⚠️ Transaction {tx_time} has NO source address")
+                
+                # DEBUG: stampa la struttura per capire
+                if isinstance(in_msg, dict):
+                    print(f"  in_msg keys: {list(in_msg.keys())}")
+                    if "source" in in_msg:
+                        print(f"  source type: {type(in_msg['source'])}")
+                        print(f"  source preview: {str(in_msg['source'])[:100]}")
                 continue
             
+            # Pulisci l'indirizzo (rimuovi '0:' se presente)
+            if source_address and source_address.startswith('0:'):
+                source_address = source_address[2:]
+                print(f"[DEBUG] Cleaned address: {source_address[-8:]}")
+            
             print(f"[royalty_trs] Processing transaction from {source_address[-8:]} (time: {tx_time})", flush=True)
+
+                
             
             # FILTRO 3: È UNA VENDITA NFT?
             stack, method_used = await toncenter_api.get_sale_data_with_retry(source_address)
