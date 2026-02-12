@@ -658,206 +658,182 @@ async def telegram_polling_handler():
         traceback.print_exc()
 
 async def royalty_trs(royalty_address: str):
-    """Check transactions for royalty address and process NFT sales - UPDATED FOR API v3"""
     try:
-        # 1. READ lastUtime
         last_utime = read_last_utime()
-        print(f"\n[DEBUG] Last utime from file: {last_utime} ({time.ctime(last_utime) if last_utime > 0 else 'epoch'})")
+        print(f"\n[DEBUG] Last utime: {last_utime}")
         
-        # 2. FETCH TRANSACTIONS CON API V3
-        print(f"[royalty_trs] Fetching transactions for {royalty_address[-8:]}...", flush=True)
+        # FETCH TRANSACTIONS
         transactions = await toncenter_api.get_transactions(royalty_address, limit=25)
         
-        # DEBUG
-        print(f"[DEBUG] Transactions variable type: {type(transactions)}")
-        print(f"[DEBUG] Is None? {transactions is None}")
-        print(f"[DEBUG] Is list? {isinstance(transactions, list)}")
-        print(f"[DEBUG] Length: {len(transactions) if transactions else 0}")
-        
-        if transactions is None:
-            print(f"[DEBUG] ❌ get_transactions() returned None (API error?)", flush=True)
-            return None
-        
         if not transactions:
-            print(f"[DEBUG] ✅ get_transactions() returned EMPTY list []", flush=True)
-            print(f"[DEBUG] This means API v3 responded but found no transactions", flush=True)
+            print(f"[DEBUG] No transactions returned from API")
+            return None
             
-            # Verifica aggiuntiva: prova un test diretto
-            await test_direct_api_call(royalty_address)
+        # FILTRA SOLO DICT VALIDI
+        valid_txs = []
+        invalid_count = 0
+        for tx in transactions:
+            if isinstance(tx, dict):
+                # Verifica che abbia i campi minimi necessari
+                tx_keys = list(tx.keys())
+                if 'now' in tx and 'in_msg' in tx:
+                    valid_txs.append(tx)
+                else:
+                    invalid_count += 1
+                    print(f"[DEBUG] Skipping dict without required fields: {tx_keys}")
+            else:
+                invalid_count += 1
+                print(f"[DEBUG] Skipping non-dict transaction: {type(tx)}")
+        
+        print(f"[DEBUG] Valid transactions: {len(valid_txs)}, Invalid: {invalid_count}")
+        
+        if not valid_txs:
+            print("[DEBUG] No valid transaction dicts found")
             return None
         
-        print(f"[royalty_trs] Found {len(transactions)} transactions for {royalty_address[-8:]}", flush=True)
-        
-        # MODIFICA: Usa safe_tx_get invece di .get() diretto
-        print(f"[DEBUG] First 3 transactions sample (API v3 format):")
-        for i, tx in enumerate(transactions[:3]):
-            # ✅ USA safe_tx_get invece di tx.get()
-            tx_time = safe_tx_get(tx, "now", 0)
-            tx_hash = safe_tx_get(tx, "hash", "")
-            tx_lt = safe_tx_get(tx, "lt", "N/A")
-            
-            print(f"  TX{i}: now={tx_time} ({time.ctime(tx_time) if tx_time > 0 else 'N/A'})")
-            print(f"       hash: {tx_hash[:10] + '...' if tx_hash else 'no-hash'}, lt: {tx_lt}")
-            
-            # ✅ USA safe_tx_get anche per struttura nidificata
-            in_msg = safe_tx_get(tx, "in_msg", {})
-            if in_msg:
-                source = safe_tx_get(in_msg, "source", {})
-                if isinstance(source, dict):
-                    source_addr = safe_tx_get(source, "address", "no-source")
-                    value = int(safe_tx_get(in_msg, "value", 0)) / 1e9
-                    print(f"       source: {source_addr[-8:] if source_addr else 'no-source'}, value: {value:.2f} TON")
-        
-        # STATISTICHE AGGIORNATE PER V3 (usa safe_tx_get)
-        # Prima verifica che tutte le transazioni siano dict
-        valid_txs = [tx for tx in transactions if isinstance(tx, dict)]
-        invalid_txs = [tx for tx in transactions if not isinstance(tx, dict)]
-        
-        if invalid_txs:
-            print(f"[WARN] Found {len(invalid_txs)} invalid transactions (not dicts):")
-            for i, tx in enumerate(invalid_txs[:3]):
-                print(f"  Invalid TX {i}: type={type(tx)}, value={str(tx)[:50]}")
-        
-        stats = {
-            "total": len(transactions),
-            "valid_dicts": len(valid_txs),
-            "invalid_types": len(invalid_txs),
-            "already_processed": 0,      # tx_time <= last_utime
-            "new_transactions": 0,       # tx_time > last_utime
-            "new_no_source": 0,          # nuove ma senza source address
-            "new_not_sale": 0,           # nuove ma non vendite NFT
-            "new_invalid_sale": 0,       # nuove con sale data invalido
-            "new_nft_sales": 0,          # nuove vendite NFT valide
-            "new_monitored": 0,          # nuove in collezioni monitorate
-            "time_range": {
-                "min": min(safe_tx_get(tx, "now", 0) for tx in valid_txs) if valid_txs else 0,
-                "max": max(safe_tx_get(tx, "now", 0) for tx in valid_txs) if valid_txs else 0,
-            }
-        }
+        print(f"[DEBUG] Processing {len(valid_txs)} valid transactions")
         
         latest_utime = last_utime
         processed_count = 0
         
-        # 3. PROCESS TRANSACTIONS - SOLO QUELLE VALIDE (dict)
-        for tx in valid_txs:
-            tx_time = safe_tx_get(tx, "now", 0)
+        # Processa in ordine crescente (come pytonlib)
+        for tx in valid_txs[::-1]:
+            tx_time = tx.get('now', 0)
+            tx_hash = tx.get('hash', 'unknown')[:10]
             
-            # FILTRO 1: TIMESTAMP
+            print(f"\n[DEBUG] ===== PROCESSING TX {tx_hash}... =====")
+            print(f"[DEBUG] TX time: {tx_time} ({time.ctime(tx_time)})")
+            
+            # FILTRO 1: TIMESTAMP (come pytonlib)
             if tx_time <= last_utime:
-                stats["already_processed"] += 1
+                print(f"[DEBUG] ⏭️ TX older than last_utime ({last_utime}), skipping")
                 continue
-
-
-                    # NUOVA TRANSAZIONE
-            stats["new_transactions"] += 1
+            print(f"[DEBUG] ✅ TX is newer than last_utime")
             
-            if tx_time > latest_utime:
-                latest_utime = tx_time
-            
-            in_msg = safe_tx_get(tx, "in_msg", {})
-            source_address = None
-            
-            # Strategie multiple per trovare il source address
-            if isinstance(in_msg, dict):
-                # Strategia 1: source come stringa diretta (API v3)
-                if "source" in in_msg:
-                    if isinstance(in_msg["source"], str):
-                        source_address = in_msg["source"]
-                        print(f"[DEBUG] ✅ Source from string: {source_address[-8:]}")
-                    elif isinstance(in_msg["source"], dict):
-                        source_address = in_msg["source"].get("address")
-                        if source_address:
-                            print(f"[DEBUG] ✅ Source from dict: {source_address[-8:]}")
-                
-                # Strategia 2: cerca in campi alternativi
-                if not source_address:
-                    for alt_key in ['src', 'from', 'sender']:
-                        if alt_key in in_msg:
-                            if isinstance(in_msg[alt_key], str):
-                                source_address = in_msg[alt_key]
-                                print(f"[DEBUG] ✅ Source from '{alt_key}': {source_address[-8:]}")
-                                break
-                            elif isinstance(in_msg[alt_key], dict):
-                                source_address = in_msg[alt_key].get("address")
-                                if source_address:
-                                    print(f"[DEBUG] ✅ Source from '{alt_key}'.address: {source_address[-8:]}")
-                                    break
-            
-            # FILTRO 2: SOURCE ADDRESS
-            if not source_address:
-                stats["new_no_source"] += 1
-                print(f"[DEBUG] ⚠️ Transaction {tx_time} has NO source address")
-                
-                # DEBUG: stampa la struttura per capire
-                if isinstance(in_msg, dict):
-                    print(f"  in_msg keys: {list(in_msg.keys())}")
-                    if "source" in in_msg:
-                        print(f"  source type: {type(in_msg['source'])}")
-                        print(f"  source preview: {str(in_msg['source'])[:100]}")
+            # FILTRO 2: SOURCE ADDRESS (ADATTATO ALLA REALTÀ V3)
+            in_msg = tx.get('in_msg', {})
+            if not isinstance(in_msg, dict):
+                print(f"[DEBUG] ❌ in_msg not dict: {type(in_msg)}")
                 continue
             
-            # Pulisci l'indirizzo (rimuovi '0:' se presente)
-            if source_address and source_address.startswith('0:'):
+            print(f"[DEBUG] in_msg keys: {list(in_msg.keys())}")
+            
+            source_address = in_msg.get('source')
+            print(f"[DEBUG] Raw source address: '{source_address}'")
+            print(f"[DEBUG] Source type: {type(source_address)}")
+            
+            # Controllo source vuoto (come pytonlib)
+            if not source_address or source_address == '':
+                print(f"[DEBUG] ❌ Empty source address")
+                continue
+            
+            # Verifica valore della transazione
+            tx_value = int(in_msg.get('value', 0)) / 1e9
+            print(f"[DEBUG] Transaction value: {tx_value:.4f} TON")
+            
+            # Pulisci indirizzo raw
+            original_source = source_address
+            if isinstance(source_address, str) and source_address.startswith('0:'):
                 source_address = source_address[2:]
-                print(f"[DEBUG] Cleaned address: {source_address[-8:]}")
+                print(f"[DEBUG] Cleaned source address: {original_source} → {source_address}")
             
-            print(f"[royalty_trs] Processing transaction from {source_address[-8:]} (time: {tx_time})", flush=True)
-
-                
+            print(f"[DEBUG] ✅ Source address: {source_address[-12:] if len(source_address) > 12 else source_address}")
             
-            # FILTRO 3: È UNA VENDITA NFT?
-            stack, method_used = await toncenter_api.get_sale_data_with_retry(source_address)
+            # FILTRO 3: GET SALE DATA (come pytonlib, con tutti i metodi)
+            stack = None
+            method_used = None
+            
+            print(f"[DEBUG] Attempting get_methods on {source_address[-12:]}...")
+            for method in ['get_sale_data', 'get_offer_data', 'get_nft_data']:
+                try:
+                    print(f"[DEBUG] Trying {method}...")
+                    stack = await toncenter_api.run_get_method(source_address, method)
+                    if stack is not None:
+                        method_used = method
+                        print(f"[DEBUG] ✅ {method} SUCCESS! Stack length: {len(stack)}")
+                        break
+                    else:
+                        print(f"[DEBUG] ❌ {method} returned None")
+                except Exception as e:
+                    print(f"[DEBUG] ❌ {method} error: {str(e)[:50]}")
+                    continue
             
             if not stack:
-                stats["new_not_sale"] += 1
-                print(f"[royalty_trs] ❌ No sale data found for {source_address[-8:]} (not NFT sale)", flush=True)
+                print(f"[DEBUG] ❌ No sale data found from any method")
                 continue
+            print(f"[DEBUG] ✅ Sale data obtained via {method_used}")
             
-            print(f"[royalty_trs] ✅ Success with {method_used}! Stack has {len(stack)} items", flush=True)
-            
-            # FILTRO 4: PARSING DATI VENDITA
+            # FILTRO 4: PARSE SALE STACK
+            print(f"[DEBUG] Parsing sale stack...")
             sale_data = parse_sale_stack(stack)
             
+            if sale_data:
+                print(f"[DEBUG] Sale data parsed:")
+                print(f"  Type: {sale_data[0]}")
+                print(f"  Complete: {sale_data[1]}")
+                print(f"  Marketplace: {sale_data[3][-12:] if len(sale_data) > 3 and sale_data[3] else 'None'}")
+                print(f"  NFT: {sale_data[4][-12:] if len(sale_data) > 4 and sale_data[4] else 'None'}")
+            else:
+                print(f"[DEBUG] ❌ Failed to parse sale stack")
+            
+            # Controllo is_complete (come pytonlib: sale_contract_data[1])
             if not sale_data or not sale_data[1]:
-                stats["new_invalid_sale"] += 1
-                print(f"[royalty_trs] ❌ Invalid sale data", flush=True)
+                print(f"[DEBUG] ❌ Invalid or incomplete sale data (is_complete={sale_data[1] if sale_data else 'None'})")
                 continue
+            print(f"[DEBUG] ✅ Sale data valid and complete")
             
-            # VENDITA NFT VALIDA!
-            stats["new_nft_sales"] += 1
-            sale_type = sale_data[0]
-            print(f"[DEBUG] 🎯 NFT SALE FOUND! Type: {sale_type}")
-            
+            # FILTRO 5: NFT DATA
             nft_address = sale_data[4] if len(sale_data) > 4 else None
+            print(f"[DEBUG] NFT address from sale data: {nft_address[-12:] if nft_address else 'None'}")
             
             if not nft_address:
+                print(f"[DEBUG] ❌ No NFT address in sale data")
                 continue
             
-            print(f"[royalty_trs] Fetching NFT data for {nft_address[-8:]}...", flush=True)
+            print(f"[DEBUG] Fetching NFT data for {nft_address[-12:]}...")
             nft_data = await get_nft_data(nft_address)
             
-            if not nft_data:
-                print(f"[royalty_trs] ❌ NFT data not found for {nft_address[-8:]}", flush=True)
+            if nft_data:
+                print(f"[DEBUG] NFT data received:")
+                print(f"  Init: {nft_data[0]}")
+                print(f"  Collection: {nft_data[1][-12:] if nft_data[1] else 'None'}")
+                print(f"  Owner: {nft_data[2][-12:] if nft_data[2] else 'None'}")
+                print(f"  Name: {nft_data[3]}")
+                print(f"  Has image: {'Yes' if nft_data[4] else 'No'}")
+            else:
+                print(f"[DEBUG] ❌ No NFT data received")
+            
+            # Controllo NFT data (come pytonlib: sale_nft_data[0] and sale_nft_data[1])
+            if not nft_data or not nft_data[0] or not nft_data[1]:
+                print(f"[DEBUG] ❌ Invalid NFT data - init: {nft_data[0] if nft_data else 'None'}, collection: {nft_data[1] if nft_data else 'None'}")
                 continue
+            print(f"[DEBUG] ✅ NFT data valid")
             
             collection_address = nft_data[1]
+            print(f"[DEBUG] Collection address: {collection_address[-12:] if collection_address else 'None'}")
             
-            # FILTRO 5: COLLEZIONE MONITORATA?
+            # FILTRO 6: COLLEZIONE MONITORATA
+            print(f"[DEBUG] Checking if collection is monitored...")
+            print(f"[DEBUG] Collection in collections_list? {collection_address in collections_list}")
+            
             if collection_address not in collections_list:
-                print(f"[royalty_trs] ❌ Collection {collection_address[-8:]} not monitored", flush=True)
+                print(f"[DEBUG] ❌ Collection not in monitored list")
+                print(f"[DEBUG] Monitored collections: {[c[-12:] for c in collections_list]}")
                 continue
+            print(f"[DEBUG] ✅ Collection is monitored!")
             
-            stats["new_monitored"] += 1
-            print(f"[royalty_trs] ✅ Collection {collection_address[-8:]} is monitored!", flush=True)
+            # GET FLOOR PRICE
+            print(f"[DEBUG] Fetching floor price for collection...")
+            floor_price, floor_link = await get_collection_floor(collection_address)
+            print(f"[DEBUG] Floor price: {floor_price} TON, Link: {floor_link[:20] if floor_link else 'None'}")
             
-            print(f"[royalty_trs] Fetching floor for collection {collection_address[-8:]}...", flush=True)
-            floor_data = await get_collection_floor(collection_address)
-            floor_price, floor_link = floor_data
-            
-            # INVIO NOTIFICA
+            # INVIO NOTIFICA (come pytonlib)
             try:
+                print(f"[DEBUG] Sending Telegram notification...")
+                
                 if sale_data[0] == 'SaleFixPrice':
                     price = sale_data[6] if len(sale_data) > 6 else 0
+                    print(f"[DEBUG] SaleFixPrice - Price: {price} TON")
                     await tg_message_async(
                         sale_data[0], sale_data[3], sale_data[4],
                         sale_data[5], nft_data[2], price,
@@ -867,6 +843,7 @@ async def royalty_trs(royalty_address: str):
                 
                 elif sale_data[0] == 'SaleAuction':
                     price = sale_data[11] if len(sale_data) > 11 else 0
+                    print(f"[DEBUG] SaleAuction - Price: {price} TON")
                     await tg_message_async(
                         sale_data[0], sale_data[3], sale_data[4],
                         sale_data[5], nft_data[2], price,
@@ -876,6 +853,7 @@ async def royalty_trs(royalty_address: str):
                 
                 elif sale_data[0] == 'SaleOffer':
                     price = sale_data[6] if len(sale_data) > 6 else 0
+                    print(f"[DEBUG] SaleOffer - Price: {price} TON")
                     await tg_message_async(
                         sale_data[0], sale_data[3], sale_data[4],
                         sale_data[5], nft_data[2], price,
@@ -883,38 +861,33 @@ async def royalty_trs(royalty_address: str):
                         floor_price, floor_link
                     )
                 
-                print(f"[royalty_trs] ✅ Telegram notification sent for {nft_data[3]}", flush=True)
+                else:
+                    print(f"[DEBUG] ❌ Unknown sale type: {sale_data[0]}")
+                    continue
+                
+                print(f"[DEBUG] ✅ Telegram notification sent successfully!")
                 processed_count += 1
+                latest_utime = max(latest_utime, tx_time)
+                print(f"[DEBUG] Updated latest_utime to {latest_utime}")
                 
             except Exception as e:
-                print(f"[royalty_trs] ❌ Telegram error: {e}", flush=True)
+                print(f"[DEBUG] ❌ Telegram error: {e}")
                 traceback.print_exc()
+                continue
         
-        # REPORT STATISTICHE FINALE
-        print(f"\n[STATS] ======= TRANSACTION ANALYSIS (API v3) =======")
-        print(f"[STATS] Total transactions from API: {stats['total']}")
-        print(f"[STATS] Valid dict transactions: {stats['valid_dicts']}")
-        print(f"[STATS] Invalid (non-dict) transactions: {stats['invalid_types']}")
-        print(f"[STATS] Time range: {stats['time_range']['min']} → {stats['time_range']['max']}")
-        print(f"[STATS] Already processed (time filter): {stats['already_processed']}")
-        print(f"[STATS] New transactions found: {stats['new_transactions']}")
-        print(f"[STATS]   - No source address: {stats['new_no_source']}")
-        print(f"[STATS]   - Not NFT sales: {stats['new_not_sale']}")
-        print(f"[STATS]   - Invalid sale data: {stats['new_invalid_sale']}")
-        print(f"[STATS]   - Valid NFT sales: {stats['new_nft_sales']}")
-        print(f"[STATS]   - In monitored collections: {stats['new_monitored']}")
-        print(f"[STATS] Final notifications sent: {processed_count}")
-        print(f"[STATS] Latest timestamp this cycle: {latest_utime}")
-        print(f"[STATS] ==============================================\n")
-        
-        # Aggiorna lastUtime solo se abbiamo processato qualcosa
-        if processed_count > 0 or stats['new_transactions'] > 0:
-            return latest_utime if latest_utime > last_utime else None
+        # UPDATE lastUtime (come pytonlib: return utimes[-1])
+        if processed_count > 0:
+            write_last_utime(latest_utime)
+            print(f"\n[DEBUG] ✅ Cycle complete - Sent {processed_count} notifications")
+            print(f"[DEBUG] ✅ Updated lastUtime from {last_utime} to {latest_utime}")
+            return latest_utime
         else:
-            return None
-    
+            print(f"\n[DEBUG] No notifications sent this cycle")
+        
+        return None
+        
     except Exception as e:
-        print(f"[royalty_trs] CRITICAL Error for {royalty_address[-8:]}: {e}", flush=True)
+        print(f"[royalty_trs] ❌ CRITICAL ERROR: {e}")
         traceback.print_exc()
         return None
 
