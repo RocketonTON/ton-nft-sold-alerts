@@ -336,15 +336,14 @@ def extract_nft_from_comment(tx: dict) -> Optional[str]:
     
     return None
 
-async def get_nft_from_transaction_hash(tx_hash: str) -> Optional[str]:
+async def get_nft_from_transaction_hash(tx_hash_hex: str) -> Optional[str]:
     """
-    Trova NFT address usando lo HASH della transazione di royalty!
-    ✅ 100% PRECISO - Collega direttamente royalty → NFT transfer!
+    Trova NFT address usando lo HASH della transazione in FORMATO HEX!
     """
     try:
         url = "https://toncenter.com/api/v3/actions"
         params = {
-            "transaction_hash": tx_hash,  # ← HASH della transazione royalty!
+            "transaction_hash": tx_hash_hex,  # ← QUI VA HEX, NON BASE64!
             "limit": 10
         }
         
