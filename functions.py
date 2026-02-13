@@ -8,6 +8,16 @@ from typing import Optional, Dict, Any, Tuple
 from secretData import cmc_token
 from config import tonorg_price_url, cmc_url, cmc_headers
 
+# === TON CENTER API CONFIGURATION ===
+from secretData import toncenter_api_key
+
+TONCENTER_HEADERS = {
+    "accept": "application/json",
+    "Content-Type": "application/json"
+}
+if toncenter_api_key:
+    TONCENTER_HEADERS["X-API-Key"] = toncenter_api_key
+
 async def convert_ton_to_usd(ton: float) -> Optional[float]:
     """Convert TON to USD (async)"""
     try:
