@@ -54,7 +54,8 @@ try:
     from functions import parse_sale_stack, convert_ton_to_usd
     from functions import get_nft_from_sale_contract, extract_nft_from_comment
     from functions import get_nft_from_transaction_hash
-    from functions import get_nft_from_transaction_messages  # FIX: recupero NFT da messaggi
+    from functions import get_nft_from_transaction_messages # FIX: recupero NFT da messaggi
+    from functions import get_nft_from_sale_contract_v2
     print("[DEBUG] ✅ functions imported", flush=True)
 except Exception as e:
     print(f"[DEBUG] ❌ functions import failed: {e}", flush=True)
