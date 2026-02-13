@@ -463,5 +463,52 @@ def get_nft_from_stack_or_messages(transaction_data):
     print("[DEBUG] 🔄 Stack vuoto o non valido, uso il metodo dei messaggi...")
     return get_nft_from_transaction_messages(transaction_data)
 
+async def get_nft_from_sale_contract_v2(sale_address: str) -> Optional[str]:
+    """
+    Recupera NFT address usando API v2 - NON cancella i dati!
+    """
+    try:
+        from secretData import toncenter_api_key
+        
+        headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        if toncenter_api_key:
+            headers["X-API-Key"] = toncenter_api_key
+        
+        # 🟢 ENDPOINT V2 - /getTransactions
+        url = "https://toncenter.com/api/v2/getTransactions"
+        params = {
+            "address": sale_address,  # ← v2 usa "address", non "account"!
+            "limit": 10
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    txs = data.get('transactions', [])
+                    
+                    # Cerca l'NFT transfer nella history del contratto
+                    for tx in txs:
+                        out_msgs = tx.get('out_msgs', [])
+                        for msg in out_msgs:
+                            # Cerca opcode nft_transfer (0x5fcc3d14)
+                            if msg.get('opcode') == '0x5fcc3d14':
+                                # In v2, l'NFT address è nel destination o nel commento
+                                nft_address = msg.get('destination')
+                                if nft_address:
+                                    # Converti in formato RAW se necessario
+                                    if nft_address.startswith('EQ') or nft_address.startswith('UQ'):
+                                        from ton.utils import to_raw
+                                        nft_address = to_raw(nft_address)
+                                    print(f"[get_nft_v2] ✅ NFT found: {nft_address[-12:]}")
+                                    return nft_address
+        return None
+    except Exception as e:
+        print(f"[get_nft_v2] ❌ Error: {e}")
+        return None
+
 # Alias per retrocompatibilità
 parse_address_from_cell_v3 = parse_address_from_cell
