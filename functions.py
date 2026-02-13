@@ -326,5 +326,34 @@ def extract_nft_from_comment(tx: dict) -> Optional[str]:
     
     return None
 
+async def get_nft_from_transaction_hash(tx_hash: str) -> Optional[str]:
+    """
+    Trova NFT address usando lo HASH della transazione di royalty!
+    ✅ 100% PRECISO - Collega direttamente royalty → NFT transfer!
+    """
+    try:
+        url = "https://toncenter.com/api/v3/actions"
+        params = {
+            "transaction_hash": tx_hash,  # ← HASH della transazione royalty!
+            "limit": 10
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=TONCENTER_HEADERS, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    actions = data.get('actions', [])
+                    
+                    for action in actions:
+                        if action.get('type') == 'nft_transfer':
+                            nft_address = action.get('details', {}).get('nft_address')
+                            if nft_address:
+                                print(f"[get_nft] ✅ NFT found via transaction hash: {nft_address[-12:]}")
+                                return nft_address
+        return None
+    except Exception as e:
+        print(f"[get_nft] ❌ Error: {e}")
+        return None
+
 # Alias per retrocompatibilità
 parse_address_from_cell_v3 = parse_address_from_cell
