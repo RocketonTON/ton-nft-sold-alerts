@@ -732,17 +732,23 @@ async def royalty_trs(royalty_address: str):
                     else:
                         print(f"[DEBUG] ⚠️ NFT address MISSING from stack (API v3 deleted it)")
                                         
-                    # 🟢 3. RECOVER NFT ADDRESS - usando messaggi transazione (FIX)
+                                        # 🟢 3. RECOVER NFT ADDRESS - METODO PRINCIPALE: API v2 (NON cancella i dati!)
+                    if not nft_address:
+                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via API v2...")
+                        nft_address = await get_nft_from_sale_contract_v2(source_address)
+                        if nft_address:
+                            print(f"[DEBUG] ✅✅✅ NFT RECOVERED via v2! Address: {nft_address[-12:]}")
+                    
+                    # 🟢 4. FALLBACK 1: messaggi transazione
                     if not nft_address:
                         print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction messages...")
                         
-                        # FIX: Prima prova a recuperare dai messaggi della transazione
                         nft_address = get_nft_from_transaction_messages(tx)
                         
                         if nft_address:
                             print(f"[DEBUG] ✅✅✅ NFT RECOVERED from messages! Address: {nft_address[-12:]}")
                     
-                    # 🟢 4. FALLBACK: usa transaction hash se messaggi non funzionano
+                    # 🟢 5. FALLBACK 2: transaction hash
                     if not nft_address:
                         print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction hash...")
                         
@@ -750,7 +756,6 @@ async def royalty_trs(royalty_address: str):
                         if tx_hash_b64:
                             print(f"[DEBUG]    Base64 hash: {tx_hash_b64[:20]}...")
                             
-                            # Decodifica Base64 → Hex
                             try:
                                 import base64
                                 tx_hash_hex = base64.b64decode(tx_hash_b64).hex()
