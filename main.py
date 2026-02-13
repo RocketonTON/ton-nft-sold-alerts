@@ -54,6 +54,7 @@ try:
     from functions import parse_sale_stack, convert_ton_to_usd
     from functions import get_nft_from_sale_contract, extract_nft_from_comment
     from functions import get_nft_from_transaction_hash
+    from functions import get_nft_from_transaction_messages  # FIX: recupero NFT da messaggi
     print("[DEBUG] ✅ functions imported", flush=True)
 except Exception as e:
     print(f"[DEBUG] ❌ functions import failed: {e}", flush=True)
@@ -729,8 +730,18 @@ async def royalty_trs(royalty_address: str):
                         print(f"[DEBUG] ✅ NFT address found in stack: {nft_address[-12:]}")
                     else:
                         print(f"[DEBUG] ⚠️ NFT address MISSING from stack (API v3 deleted it)")
+                                        
+                    # 🟢 3. RECOVER NFT ADDRESS - usando messaggi transazione (FIX)
+                    if not nft_address:
+                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction messages...")
+                        
+                        # FIX: Prima prova a recuperare dai messaggi della transazione
+                        nft_address = get_nft_from_transaction_messages(tx)
+                        
+                        if nft_address:
+                            print(f"[DEBUG] ✅✅✅ NFT RECOVERED from messages! Address: {nft_address[-12:]}")
                     
-                                        # 🟢 3. RECOVER NFT ADDRESS - usando HASH della transazione!
+                    # 🟢 4. FALLBACK: usa transaction hash se messaggi non funzionano
                     if not nft_address:
                         print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction hash...")
                         
@@ -748,7 +759,7 @@ async def royalty_trs(royalty_address: str):
                                 nft_address = await get_nft_from_transaction_hash(tx_hash_hex)
                                 
                                 if nft_address:
-                                    print(f"[DEBUG] ✅✅✅ NFT RECOVERED SUCCESSFULLY! Address: {nft_address[-12:]}")
+                                    print(f"[DEBUG] ✅✅✅ NFT RECOVERED from hash! Address: {nft_address[-12:]}")
                                 else:
                                     print(f"[DEBUG] ❌❌❌ NFT RECOVERY FAILED! No NFT found for this hash")
                             except Exception as e:
