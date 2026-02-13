@@ -364,5 +364,104 @@ async def get_nft_from_transaction_hash(tx_hash_hex: str) -> Optional[str]:
         print(f"[get_nft] ❌ Error: {e}")
         return None
 
+def get_nft_from_transaction_messages(transaction_data):
+    """
+    Recupera l'indirizzo NFT analizzando i messaggi della transazione
+    
+    Args:
+        transaction_data: dizionario con i dati della transazione dall'API
+        
+    Returns:
+        str: indirizzo NFT se trovato, None altrimenti
+    """
+    try:
+        # Prova a cercare nei messaggi in uscita (out_msgs)
+        if 'out_msgs' in transaction_data and transaction_data['out_msgs']:
+            for msg in transaction_data['out_msgs']:
+                # Il messaggio verso l'NFT è tipicamente quello con destination
+                if 'destination' in msg and msg.get('destination'):
+                    destination = msg['destination']
+                    
+                    # Verifica se potrebbe essere un indirizzo NFT valido
+                    # Gli NFT di solito hanno indirizzi che iniziano con EQ
+                    if isinstance(destination, str) and destination.startswith('EQ'):
+                        print(f"[DEBUG] 🎯 NFT trovato in out_msgs: {destination}")
+                        return destination
+                    
+                    # Se destination è un dict con address
+                    if isinstance(destination, dict) and 'address' in destination:
+                        address = destination['address']
+                        if address.startswith('EQ'):
+                            print(f"[DEBUG] 🎯 NFT trovato in out_msgs (dict): {address}")
+                            return address
+        
+        # Prova anche con i messaggi in entrata (in_msg)
+        if 'in_msg' in transaction_data and transaction_data['in_msg']:
+            in_msg = transaction_data['in_msg']
+            
+            if 'source' in in_msg and in_msg.get('source'):
+                source = in_msg['source']
+                
+                if isinstance(source, str) and source.startswith('EQ'):
+                    print(f"[DEBUG] 🎯 NFT trovato in in_msg source: {source}")
+                    return source
+                
+                if isinstance(source, dict) and 'address' in source:
+                    address = source['address']
+                    if address.startswith('EQ'):
+                        print(f"[DEBUG] 🎯 NFT trovato in in_msg source (dict): {address}")
+                        return address
+        
+        # Ultimo tentativo: cerca in decoded_body se presente
+        if 'decoded_body' in transaction_data:
+            decoded = transaction_data['decoded_body']
+            if isinstance(decoded, dict):
+                # Cerca ricorsivamente negli attributi comuni
+                for key in ['nft_address', 'nft', 'item_address', 'address']:
+                    if key in decoded and decoded[key]:
+                        address = decoded[key]
+                        if isinstance(address, str) and address.startswith('EQ'):
+                            print(f"[DEBUG] 🎯 NFT trovato in decoded_body[{key}]: {address}")
+                            return address
+        
+        print("[DEBUG] ⚠️ Nessun indirizzo NFT trovato nei messaggi della transazione")
+        return None
+        
+    except Exception as e:
+        print(f"[DEBUG] ❌ Errore durante l'estrazione NFT dai messaggi: {e}")
+        return None
+
+
+def get_nft_from_stack_or_messages(transaction_data):
+    """
+    Metodo ibrido: prima prova lo stack (per compatibilità), 
+    poi fallback ai messaggi
+    
+    Args:
+        transaction_data: dizionario con i dati della transazione
+        
+    Returns:
+        str: indirizzo NFT se trovato, None altrimenti
+    """
+    # Prova prima il metodo vecchio (stack)
+    if 'compute_phase' in transaction_data:
+        compute = transaction_data['compute_phase']
+        if 'stack' in compute and compute['stack']:
+            stack = compute['stack']
+            
+            # Cerca negli elementi dello stack
+            for item in stack:
+                if isinstance(item, dict):
+                    # Cerca il campo 'address' o 'cell'
+                    if 'address' in item and item['address']:
+                        address = item['address']
+                        if isinstance(address, str) and address.startswith('EQ'):
+                            print(f"[DEBUG] 🎯 NFT trovato nello stack: {address}")
+                            return address
+    
+    # Se non trovato nello stack, usa i messaggi
+    print("[DEBUG] 🔄 Stack vuoto o non valido, uso il metodo dei messaggi...")
+    return get_nft_from_transaction_messages(transaction_data)
+
 # Alias per retrocompatibilità
 parse_address_from_cell_v3 = parse_address_from_cell
