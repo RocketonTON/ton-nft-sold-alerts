@@ -107,11 +107,21 @@ class TonCenterAPI:
         self.headers = TONCENTER_HEADERS
         self.timeout = HTTP_TIMEOUT
         self.min_request_interval = TONCENTER_RATE_LIMIT
+        self.last_request_time = 0
         
         print(f"[DEBUG] Using API: {self.base_url}")
         print(f"[DEBUG] API Key present: {'Yes' if toncenter_api_key else 'No (rate limited)'}")
+
+    async def _rate_limit(self):
+        """Assicura almeno 1 secondo tra le richieste"""
+        now = time.time()
+        time_since_last = now - self.last_request_time
+        if time_since_last < 1.0:
+            await asyncio.sleep(1.0 - time_since_last)
+        self.last_request_time = time.time()
     
     async def get_transactions(self, address: str, limit: int = 25) -> list:
+        await self._rate_limit()
         """Fetch transactions using correct TON Center API v3 endpoint and parameters - FIXED VERSION"""
         
         print(f"\n[DEBUG] get_transactions called for: {address[-8:]}")
@@ -275,6 +285,7 @@ class TonCenterAPI:
         return []
     
     async def run_get_method(self, address: str, method: str, stack: list = None) -> list:
+        await self._rate_limit()
         """Execute a get method on a smart contract - API v3 COMPATIBLE"""
         try:
             print(f"[DEBUG] run_get_method called: address={address[-8:]}, method={method}")
