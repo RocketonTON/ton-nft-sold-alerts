@@ -692,6 +692,13 @@ async def royalty_trs(royalty_address: str):
         
         for idx, tx in enumerate(transactions[::-1]):
             tx_time = tx.get('now', 0)
+            tx_hash_full = tx.get('hash', '')
+            tx_hash_short = tx_hash_full[:16] if tx_hash_full else 'unknown'
+            
+            print(f"\n[DEBUG] ===== TX [{idx}] ===================")
+            print(f"[DEBUG] Hash: {tx_hash_short}...")
+            print(f"[DEBUG] Time: {tx_time} ({time.ctime(tx_time)})")
+            
             in_msg = tx.get('in_msg', {})
             source_address = in_msg.get('source')
             
@@ -700,72 +707,111 @@ async def royalty_trs(royalty_address: str):
                 print(f"[DEBUG] ⏭️ TX {idx}: Skipped (timestamp or empty source)")
                 continue
             
-            print(f"\n[DEBUG] 📍 TX {idx} - Processing sale contract: {source_address[-12:]}")
+            print(f"[DEBUG] ✅ Source address: {source_address[-12:] if source_address else 'None'}")
             print(f"[DEBUG]    Value: {int(in_msg.get('value', 0)) / 1e9:.4f} TON")
             
             # 🟢 1. GET SALE DATA - like pytonlib
+            print(f"[DEBUG] 🔍 Calling get_sale_data() on {source_address[-12:]}...")
             stack = await toncenter_api.run_get_method(source_address, 'get_sale_data')
             
             if stack:
+                print(f"[DEBUG] ✅ get_sale_data() success! Stack size: {len(stack)}")
+                
                 # 🟢 2. PARSE SALE STACK - like pytonlib
                 sale_data = parse_sale_stack(stack)
                 
                 if sale_data and sale_data[1]:  # is_complete = True (SOLD!)
-                    print(f"[DEBUG]    ✅ Sale completed! Type: {sale_data[0]}, Price: {sale_data[6] if len(sale_data) > 6 else 0} TON")
+                    print(f"[DEBUG] ✅ Sale completed! Type: {sale_data[0]}, Price: {sale_data[6] if len(sale_data) > 6 else 0} TON")
                     
                     nft_address = sale_data[4] if len(sale_data) > 4 else None
                     
-                                        # 🟢 3. RECOVER NFT ADDRESS - usando HASH della transazione!
+                    if nft_address:
+                        print(f"[DEBUG] ✅ NFT address found in stack: {nft_address[-12:]}")
+                    else:
+                        print(f"[DEBUG] ⚠️ NFT address MISSING from stack (API v3 deleted it)")
+                    
+                    # 🟢 3. RECOVER NFT ADDRESS - usando HASH della transazione!
                     if not nft_address:
-                        print(f"[DEBUG]    🔍 NFT address hidden - recovering via transaction hash...")
-                        tx_hash = tx.get('hash')  # ← Prendi l'hash della transazione corrente!
+                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction hash...")
+                        print(f"[DEBUG]    Transaction hash (full): {tx_hash_full}")
+                        print(f"[DEBUG]    Transaction hash (short): {tx_hash_short}...")
+                        
+                        tx_hash = tx.get('hash')
                         if tx_hash:
+                            print(f"[DEBUG]    Calling get_nft_from_transaction_hash()...")
                             nft_address = await get_nft_from_transaction_hash(tx_hash)
+                            
                             if nft_address:
-                                print(f"[DEBUG]    ✅ NFT address recovered: {nft_address[-12:]}")
+                                print(f"[DEBUG] ✅✅✅ NFT RECOVERED SUCCESSFULLY! Address: {nft_address[-12:]}")
+                                print(f"[DEBUG]    Full address: {nft_address}")
+                            else:
+                                print(f"[DEBUG] ❌❌❌ NFT RECOVERY FAILED! No NFT address found for this transaction hash")
+                                print(f"[DEBUG]    Possible reasons:")
+                                print(f"[DEBUG]      - No NFT transfer in this transaction")
+                                print(f"[DEBUG]      - API error or timeout")
+                                print(f"[DEBUG]      - Transaction hash format issue")
+                        else:
+                            print(f"[DEBUG] ❌ No transaction hash available in tx object")
+                            print(f"[DEBUG]    tx keys: {list(tx.keys()) if isinstance(tx, dict) else 'Not a dict'}")
                     
                     if nft_address:
-                        # 🟢 4. GET NFT DATA - like pytonlib
+                        print(f"[DEBUG] 📥 Fetching NFT data for {nft_address[-12:]}...")
                         nft_data = await get_nft_data(nft_address)
                         
                         if nft_data and nft_data[0] and nft_data[1]:
                             collection_address = nft_data[1]
+                            print(f"[DEBUG] ✅ NFT data retrieved! Collection: {collection_address[-12:] if collection_address else 'None'}")
                             
                             # 🟢 5. CHECK MONITORED COLLECTION - like pytonlib
                             if collection_address in collections_list:
-                                print(f"[DEBUG]    ✅ Collection monitored: {collection_address[-12:]}")
+                                print(f"[DEBUG] ✅✅✅ COLLECTION MONITORED! {collection_address[-12:]}")
                                 
                                 # 🟢 6. GET FLOOR PRICE
+                                print(f"[DEBUG] 📊 Fetching floor price...")
                                 floor_price, floor_link = await get_collection_floor(collection_address)
+                                print(f"[DEBUG]    Floor: {floor_price} TON" if floor_price else "[DEBUG]    Floor: None")
                                 
                                 # 🟢 7. SEND NOTIFICATION - like pytonlib!
                                 try:
+                                    print(f"[DEBUG] 📨 SENDING TELEGRAM NOTIFICATION...")
                                     await tg_message_async(
-                                        sale_data[0],                 # action
-                                        sale_data[3] if len(sale_data) > 3 else None,  # marketplace
-                                        nft_address,                  # nft_address
-                                        sale_data[5] if len(sale_data) > 5 else None,  # prev_owner
-                                        nft_data[2],                  # new_owner
-                                        sale_data[6] if len(sale_data) > 6 else 0,  # price
-                                        nft_data[3] if len(nft_data) > 3 else "Unknown NFT",  # nft_name
-                                        nft_data[4] if len(nft_data) > 4 else "",  # nft_image
-                                        floor_price,                  # floor_ton
-                                        floor_link                    # floor_link
+                                        sale_data[0],
+                                        sale_data[3] if len(sale_data) > 3 else None,
+                                        nft_address,
+                                        sale_data[5] if len(sale_data) > 5 else None,
+                                        nft_data[2],
+                                        sale_data[6] if len(sale_data) > 6 else 0,
+                                        nft_data[3] if len(nft_data) > 3 else "Unknown NFT",
+                                        nft_data[4] if len(nft_data) > 4 else "",
+                                        floor_price,
+                                        floor_link
                                     )
-                                    print(f"[DEBUG]    ✅ Notification sent!")
+                                    print(f"[DEBUG] ✅✅✅ NOTIFICATION SENT SUCCESSFULLY!")
                                     utimes.append(tx_time)
                                     processed_count += 1
                                     
                                 except Exception as e:
-                                    print(f"[DEBUG]    ❌ Notification error: {e}")
+                                    print(f"[DEBUG] ❌❌❌ NOTIFICATION FAILED: {e}")
+                                    import traceback
+                                    traceback.print_exc()
                             else:
-                                print(f"[DEBUG]    ⚠️ Collection not monitored: {collection_address[-12:] if collection_address else 'None'}")
+                                print(f"[DEBUG] ⚠️ Collection NOT monitored: {collection_address[-12:] if collection_address else 'None'}")
+                                print(f"[DEBUG]    Monitored collections: {[c[-12:] for c in collections_list]}")
+                        else:
+                            print(f"[DEBUG] ❌ Failed to get NFT data")
+                            if not nft_data:
+                                print(f"[DEBUG]    nft_data is None")
+                            else:
+                                if not nft_data[0]:
+                                    print(f"[DEBUG]    init flag is False")
+                                if not nft_data[1]:
+                                    print(f"[DEBUG]    collection address is missing")
                     else:
-                        print(f"[DEBUG]    ❌ Could not recover NFT address")
+                        print(f"[DEBUG] ❌ No NFT address available - skipping transaction")
                 else:
-                    print(f"[DEBUG]    ⏭️ Sale not completed (is_complete=False)")
+                    print(f"[DEBUG] ⏭️ Sale not completed (is_complete=False)")
             else:
-                print(f"[DEBUG]    ⏭️ Not a sale contract")
+                print(f"[DEBUG] ⏭️ Not a sale contract (get_sale_data returned None)")
         
         # 🟢 FINAL REPORT
         print(f"\n[DEBUG] 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
