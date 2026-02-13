@@ -730,29 +730,31 @@ async def royalty_trs(royalty_address: str):
                     else:
                         print(f"[DEBUG] ⚠️ NFT address MISSING from stack (API v3 deleted it)")
                     
-                    # 🟢 3. RECOVER NFT ADDRESS - usando HASH della transazione!
+                                        # 🟢 3. RECOVER NFT ADDRESS - usando HASH della transazione!
                     if not nft_address:
                         print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction hash...")
-                        print(f"[DEBUG]    Transaction hash (full): {tx_hash_full}")
-                        print(f"[DEBUG]    Transaction hash (short): {tx_hash_short}...")
                         
-                        tx_hash = tx.get('hash')
-                        if tx_hash:
-                            print(f"[DEBUG]    Calling get_nft_from_transaction_hash()...")
-                            nft_address = await get_nft_from_transaction_hash(tx_hash)
+                        tx_hash_b64 = tx.get('hash')
+                        if tx_hash_b64:
+                            print(f"[DEBUG]    Base64 hash: {tx_hash_b64[:20]}...")
                             
-                            if nft_address:
-                                print(f"[DEBUG] ✅✅✅ NFT RECOVERED SUCCESSFULLY! Address: {nft_address[-12:]}")
-                                print(f"[DEBUG]    Full address: {nft_address}")
-                            else:
-                                print(f"[DEBUG] ❌❌❌ NFT RECOVERY FAILED! No NFT address found for this transaction hash")
-                                print(f"[DEBUG]    Possible reasons:")
-                                print(f"[DEBUG]      - No NFT transfer in this transaction")
-                                print(f"[DEBUG]      - API error or timeout")
-                                print(f"[DEBUG]      - Transaction hash format issue")
+                            # Decodifica Base64 → Hex
+                            try:
+                                import base64
+                                tx_hash_hex = base64.b64decode(tx_hash_b64).hex()
+                                print(f"[DEBUG]    Hex hash: {tx_hash_hex[:16]}...")
+                                print(f"[DEBUG]    Full hex hash: {tx_hash_hex}")
+                                
+                                nft_address = await get_nft_from_transaction_hash(tx_hash_hex)
+                                
+                                if nft_address:
+                                    print(f"[DEBUG] ✅✅✅ NFT RECOVERED SUCCESSFULLY! Address: {nft_address[-12:]}")
+                                else:
+                                    print(f"[DEBUG] ❌❌❌ NFT RECOVERY FAILED! No NFT found for this hash")
+                            except Exception as e:
+                                print(f"[DEBUG] ❌ Hash decode error: {e}")
                         else:
-                            print(f"[DEBUG] ❌ No transaction hash available in tx object")
-                            print(f"[DEBUG]    tx keys: {list(tx.keys()) if isinstance(tx, dict) else 'Not a dict'}")
+                            print(f"[DEBUG] ❌ No transaction hash in tx")
                     
                     if nft_address:
                         print(f"[DEBUG] 📥 Fetching NFT data for {nft_address[-12:]}...")
