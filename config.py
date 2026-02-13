@@ -88,16 +88,16 @@ def verify_addresses():
     # Verifica royalty_addresses
     print(f"  Royalty addresses ({len(royalty_addresses)}):")
     for i, addr in enumerate(royalty_addresses):
-        valid = (addr.startswith('0:') and len(addr) == 67 and 
-                 addr[2:].isupper() and all(c in '0123456789ABCDEF' for c in addr[2:]))
+        valid = (addr.startswith('0:') and len(addr) == 66 and  # ← 66, non 67!
+                 all(c in '0123456789ABCDEFabcdef' for c in addr[2:]))  # ← accetta minuscole!
         status = "✅" if valid else "❌"
         print(f"    [{i}] {status} {addr[:30]}...")
     
     # Verifica collections_list
     print(f"  Collections ({len(collections_list)}):")
     for i, addr in enumerate(collections_list):
-        valid = (addr.startswith('0:') and len(addr) == 67 and 
-                 addr[2:].isupper() and all(c in '0123456789ABCDEF' for c in addr[2:]))
+        valid = (addr.startswith('0:') and len(addr) == 66 and
+                 all(c in '0123456789ABCDEFabcdef' for c in addr[2:]))
         status = "✅" if valid else "❌"
         print(f"    [{i}] {status} {addr[:30]}...")
     
