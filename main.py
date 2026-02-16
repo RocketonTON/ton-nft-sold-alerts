@@ -714,9 +714,20 @@ async def royalty_trs(royalty_address: str):
             print(f"[DEBUG] ✅ Source address: {source_address[-12:] if source_address else 'None'}")
             print(f"[DEBUG]    Value: {int(in_msg.get('value', 0)) / 1e9:.4f} TON")
 
-            trace_id = tx.get('trace_id')
-            if trace_id:
-                print(f"[DEBUG] ✅ Trace ID: {trace_id[:16]}...")
+            trace_id_b64 = tx.get('trace_id')
+            trace_id = None
+            
+            if trace_id_b64:
+                print(f"[DEBUG] ✅ Trace ID (Base64): {trace_id_b64[:20]}...")
+                
+                # Decodifica Base64 → Hex
+                try:
+                    import base64
+                    trace_id = base64.b64decode(trace_id_b64).hex()
+                    print(f"[DEBUG] ✅ Trace ID (Hex): {trace_id[:16]}...")
+                except Exception as e:
+                    print(f"[DEBUG] ⚠️ Errore decodifica trace_id: {e}")
+                    trace_id = trace_id_b64  # Fallback all'originale
             else:
                 print(f"[DEBUG] ⚠️ No trace ID for this transaction")
             
