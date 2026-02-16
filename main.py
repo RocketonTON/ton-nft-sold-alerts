@@ -56,6 +56,8 @@ try:
     from functions import get_nft_from_transaction_hash
     from functions import get_nft_from_transaction_messages # FIX: recupero NFT da messaggi
     from functions import get_nft_from_sale_contract_v2
+    from functions import get_trace_id_from_tx
+    from functions import get_nft_from_trace_via_tonapi
     print("[DEBUG] ✅ functions imported", flush=True)
 except Exception as e:
     print(f"[DEBUG] ❌ functions import failed: {e}", flush=True)
