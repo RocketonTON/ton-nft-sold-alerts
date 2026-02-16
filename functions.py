@@ -536,7 +536,6 @@ async def get_trace_id_from_tx(tx: dict) -> Optional[str]:
 async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
     """
     Recupera l'indirizzo dell'NFT da una trace_id usando TonAPI V2.
-    ✅ Usa /v2/traces/{trace_id} invece di /v1/
     """
     if not trace_id:
         print("[TonAPI] ❌ Nessuna trace_id fornita.")
@@ -551,42 +550,55 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
     else:
         print("[TonAPI] ⚠️ Nessun token fornito. Rate limit più stringente.")
 
-    # 🔥 CAMBIA DA /v1/ A /v2/ !
     url = f"{TONAPI_BASE_URL}/v2/traces/{trace_id}"
-    print(f"[TonAPI] 🔍 Cerco trace (v2): {trace_id[:16]}...")
+    print(f"[TonAPI] 🔍 Cerco trace: {trace_id[:30]}...")
 
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers) as response:
                 if response.status == 429:
-                    print("[TonAPI] ❌ Rate limit superato. Aspetto 1 secondo e riprovo.")
-                    await asyncio.sleep(1)
+                    print("[TonAPI] ❌ Rate limit. Aspetto...")
+                    await asyncio.sleep(2)
                     return await get_nft_from_trace_via_tonapi(trace_id)
                 
                 if response.status != 200:
-                    print(f"[TonAPI] ❌ Errore {response.status}. Impossibile recuperare la trace.")
+                    print(f"[TonAPI] ❌ Errore {response.status}")
                     error_text = await response.text()
-                    print(f"[TonAPI]    Dettaglio: {error_text[:200]}")
+                    print(f"[TonAPI] 📄 Risposta errore: {error_text[:500]}")
                     return None
 
                 data = await response.json()
                 
-                # 🔍 La struttura della risposta V2 è leggermente diversa
-                # Cerchiamo l'azione di tipo 'NftTransfer' nella trace
+                # 🔥 DEBUG: STRUTTURA COMPLETA DELLA RISPOSTA
+                print(f"[TonAPI] 📊 STRUTTURA RISPOSTA:")
+                print(f"[TonAPI]   Chiavi principali: {list(data.keys())}")
+                
+                # Se c'è 'actions' al primo livello
+                if 'actions' in data:
+                    print(f"[TonAPI]   Numero azioni top-level: {len(data['actions'])}")
+                    for i, action in enumerate(data['actions'][:3]):  # Prime 3
+                        print(f"[TonAPI]   Azione {i}: type={action.get('type')}, keys={list(action.keys())}")
+                
+                # Se ci sono 'children'
+                if 'children' in data:
+                    print(f"[TonAPI]   Numero children: {len(data['children'])}")
+                
+                # CERCA CON PIÙ VARIANTI DI NOME!
                 def find_nft_transfer_action(transaction_data):
-                    # Controlla le azioni di alto livello
+                    # Controlla le azioni con varianti di nome
                     for action in transaction_data.get('actions', []):
-                        if action.get('type') == 'NftTransfer':
-                            nft_addr = action.get('nft_transfer', {}).get('nft_address')
-                            if nft_addr:
-                                if nft_addr.startswith('0:'):
+                        action_type = action.get('type', '').lower()
+                        
+                        # 🔥 CONTROLLA TUTTE LE VARIANTI POSSIBILI
+                        if any(nft_type in action_type for nft_type in ['nfttransfer', 'nft_transfer', 'nft-transfer', 'nft transfer']):
+                            print(f"[TonAPI] ✅ Trovata azione di tipo: {action.get('type')}")
+                            
+                            # Il campo può essere 'nft_transfer' o 'NFTTransfer' o 'nftTransfer'
+                            nft_data = action.get('nft_transfer') or action.get('NFTTransfer') or action.get('nftTransfer')
+                            if nft_data:
+                                nft_addr = nft_data.get('nft_address') or nft_data.get('address') or nft_data.get('item_address')
+                                if nft_addr:
                                     return nft_addr
-                                else:
-                                    try:
-                                        from ton.utils import to_raw
-                                        return to_raw(nft_addr)
-                                    except ImportError:
-                                        return nft_addr
                     
                     # Cerca nei children
                     for child in transaction_data.get('children', []):
@@ -600,7 +612,8 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
                 if nft_address:
                     print(f"[TonAPI] ✅ NFT trovato: {nft_address[-12:]}")
                 else:
-                    print(f"[TonAPI] ⚠️ Nessuna azione 'NftTransfer' trovata.")
+                    print(f"[TonAPI] ⚠️ NESSUN NFT TRANSFER TROVATO")
+                    print(f"[TonAPI] 💡 Suggerimento: Prova a cercare manualmente su https://tonviewer.com/trace/{trace_id}")
                 
                 return nft_address
 
