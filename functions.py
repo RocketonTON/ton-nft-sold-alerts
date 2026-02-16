@@ -7,6 +7,8 @@ import re
 from typing import Optional, Dict, Any, Tuple
 from secretData import cmc_token
 from config import tonorg_price_url, cmc_url, cmc_headers
+from secretData import tonapi_token # Importiamo il token
+
 
 # === TON CENTER API CONFIGURATION ===
 from secretData import toncenter_api_key
@@ -17,6 +19,9 @@ TONCENTER_HEADERS = {
 }
 if toncenter_api_key:
     TONCENTER_HEADERS["X-API-Key"] = toncenter_api_key
+
+# ✅ TONAPI CONFIG - subito dopo gli import, prima delle funzioni
+TONAPI_BASE_URL = "https://tonapi.io"
 
 async def convert_ton_to_usd(ton: float) -> Optional[float]:
     """Convert TON to USD (async)"""
@@ -508,6 +513,102 @@ async def get_nft_from_sale_contract_v2(sale_address: str) -> Optional[str]:
         return None
     except Exception as e:
         print(f"[get_nft_v2] ❌ Error: {e}")
+        return None
+
+async def get_trace_id_from_tx(tx: dict) -> Optional[str]:
+    """
+    Estrae la trace_id da una transazione TON Center v3.
+    La trace_id è un campo fondamentale che collega tutte le operazioni correlate.
+    """
+    trace_id = tx.get('trace_id')
+    if trace_id:
+        print(f"[get_trace_id] ✅ Trace ID trovato: {trace_id[:16]}...")
+        return trace_id
+    
+    # Se non c'è un campo trace_id diretto, potrebbe essere in altri formati.
+    print(f"[get_trace_id] ⚠️ Transazione senza trace_id diretto.")
+    # Un'ulteriore verifica potrebbe essere fatta, ma se non c'è, non possiamo fare molto.
+    return None
+
+
+async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
+    """
+    Recupera l'indirizzo dell'NFT da una trace_id usando TonAPI.
+    Questo è il metodo principale e più affidabile.
+    """
+    if not trace_id:
+        print("[TonAPI] ❌ Nessuna trace_id fornita. Impossibile procedere.")
+        return None
+
+    headers = {
+        "Accept": "application/json",
+    }
+    if tonapi_token:
+        headers["Authorization"] = f"Bearer {tonapi_token}"
+        print("[TonAPI] 🔑 Usando token API")
+    else:
+        print("[TonAPI] ⚠️ Nessun token fornito. Rate limit più stringente.")
+
+    url = f"{TONAPI_BASE_URL}/v1/traces/{trace_id}"
+    print(f"[TonAPI] 🔍 Cerco trace: {trace_id[:16]}...")
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 429:
+                    print("[TonAPI] ❌ Rate limit superato. Aspetto 1 secondo e riprovo.")
+                    await asyncio.sleep(1)
+                    # Ricorsione semplice per riprovare una volta
+                    return await get_nft_from_trace_via_tonapi(trace_id)
+                
+                if response.status != 200:
+                    print(f"[TonAPI] ❌ Errore {response.status}. Impossibile recuperare la trace.")
+                    error_text = await response.text()
+                    print(f"[TonAPI]    Dettaglio: {error_text[:200]}")
+                    return None
+
+                data = await response.json()
+                
+                # Funzione ricorsiva per cercare l'azione di trasferimento NFT
+                def find_nft_transfer_action(transaction_data):
+                    # Controlla le azioni di alto livello
+                    for action in transaction_data.get('actions', []):
+                        if action.get('type') == 'NftTransfer':
+                            nft_addr = action.get('nft_transfer', {}).get('nft_address')
+                            if nft_addr:
+                                # Assicuriamoci che sia in formato RAW (0:...) per consistenza
+                                if nft_addr.startswith('0:'):
+                                    return nft_addr
+                                else:
+                                    # Se non è RAW, proviamo a convertirlo
+                                    try:
+                                        from ton.utils import to_raw
+                                        return to_raw(nft_addr)
+                                    except ImportError:
+                                        print("[TonAPI] ⚠️ Libreria 'ton' non trovata. Restituisco indirizzo come ricevuto.")
+                                        return nft_addr
+                    
+                    # Se non trova, cerca nei children (sotto-transazioni)
+                    for child in transaction_data.get('children', []):
+                        result = find_nft_transfer_action(child)
+                        if result:
+                            return result
+                    return None
+
+                nft_address = find_nft_transfer_action(data)
+                
+                if nft_address:
+                    print(f"[TonAPI] ✅ NFT trovato: {nft_address[-12:]}")
+                else:
+                    print(f"[TonAPI] ⚠️ Nessuna azione 'NftTransfer' trovata in questa trace.")
+                
+                return nft_address
+
+    except aiohttp.ClientError as e:
+        print(f"[TonAPI] ❌ Errore di connessione: {e}")
+        return None
+    except Exception as e:
+        print(f"[TonAPI] ❌ Errore imprevisto: {e}")
         return None
 
 # Alias per retrocompatibilità
