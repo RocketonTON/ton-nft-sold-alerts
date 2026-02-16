@@ -531,13 +531,15 @@ async def get_trace_id_from_tx(tx: dict) -> Optional[str]:
     return None
 
 
+# In functions.py, modifica la funzione get_nft_from_trace_via_tonapi
+
 async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
     """
-    Recupera l'indirizzo dell'NFT da una trace_id usando TonAPI.
-    Questo è il metodo principale e più affidabile.
+    Recupera l'indirizzo dell'NFT da una trace_id usando TonAPI V2.
+    ✅ Usa /v2/traces/{trace_id} invece di /v1/
     """
     if not trace_id:
-        print("[TonAPI] ❌ Nessuna trace_id fornita. Impossibile procedere.")
+        print("[TonAPI] ❌ Nessuna trace_id fornita.")
         return None
 
     headers = {
@@ -549,8 +551,9 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
     else:
         print("[TonAPI] ⚠️ Nessun token fornito. Rate limit più stringente.")
 
-    url = f"{TONAPI_BASE_URL}/v1/traces/{trace_id}"
-    print(f"[TonAPI] 🔍 Cerco trace: {trace_id[:16]}...")
+    # 🔥 CAMBIA DA /v1/ A /v2/ !
+    url = f"{TONAPI_BASE_URL}/v2/traces/{trace_id}"
+    print(f"[TonAPI] 🔍 Cerco trace (v2): {trace_id[:16]}...")
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -558,7 +561,6 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
                 if response.status == 429:
                     print("[TonAPI] ❌ Rate limit superato. Aspetto 1 secondo e riprovo.")
                     await asyncio.sleep(1)
-                    # Ricorsione semplice per riprovare una volta
                     return await get_nft_from_trace_via_tonapi(trace_id)
                 
                 if response.status != 200:
@@ -569,26 +571,24 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
 
                 data = await response.json()
                 
-                # Funzione ricorsiva per cercare l'azione di trasferimento NFT
+                # 🔍 La struttura della risposta V2 è leggermente diversa
+                # Cerchiamo l'azione di tipo 'NftTransfer' nella trace
                 def find_nft_transfer_action(transaction_data):
                     # Controlla le azioni di alto livello
                     for action in transaction_data.get('actions', []):
                         if action.get('type') == 'NftTransfer':
                             nft_addr = action.get('nft_transfer', {}).get('nft_address')
                             if nft_addr:
-                                # Assicuriamoci che sia in formato RAW (0:...) per consistenza
                                 if nft_addr.startswith('0:'):
                                     return nft_addr
                                 else:
-                                    # Se non è RAW, proviamo a convertirlo
                                     try:
                                         from ton.utils import to_raw
                                         return to_raw(nft_addr)
                                     except ImportError:
-                                        print("[TonAPI] ⚠️ Libreria 'ton' non trovata. Restituisco indirizzo come ricevuto.")
                                         return nft_addr
                     
-                    # Se non trova, cerca nei children (sotto-transazioni)
+                    # Cerca nei children
                     for child in transaction_data.get('children', []):
                         result = find_nft_transfer_action(child)
                         if result:
@@ -600,15 +600,12 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
                 if nft_address:
                     print(f"[TonAPI] ✅ NFT trovato: {nft_address[-12:]}")
                 else:
-                    print(f"[TonAPI] ⚠️ Nessuna azione 'NftTransfer' trovata in questa trace.")
+                    print(f"[TonAPI] ⚠️ Nessuna azione 'NftTransfer' trovata.")
                 
                 return nft_address
 
-    except aiohttp.ClientError as e:
-        print(f"[TonAPI] ❌ Errore di connessione: {e}")
-        return None
     except Exception as e:
-        print(f"[TonAPI] ❌ Errore imprevisto: {e}")
+        print(f"[TonAPI] ❌ Errore: {e}")
         return None
 
 # Alias per retrocompatibilità
