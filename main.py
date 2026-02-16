@@ -715,23 +715,23 @@ async def royalty_trs(royalty_address: str):
             print(f"[DEBUG]    Value: {int(in_msg.get('value', 0)) / 1e9:.4f} TON")
 
             trace_id_b64 = tx.get('trace_id')
-            trace_id = None
-            
+            trace_id_for_tonapi = None # Questa sarà la variabile da usare per TonAPI
+            trace_id_hex_for_debug = None # Solo per debug
+
             if trace_id_b64:
-                print(f"[DEBUG] ✅ Trace ID (Base64): {trace_id_b64[:20]}...")
-                
+                print(f"[DEBUG] ✅ Trace ID (Base64 originale): {trace_id_b64[:30]}...")
+                trace_id_for_tonapi = trace_id_b64  # ✅ Questa è la variabile giusta per TonAPI!
+                # Opzionale: decodifica in hex SOLO per debug visivo
                 try:
                     import base64
-                    # Decodifica Base64 → Hex
-                    hex_part = base64.b64decode(trace_id_b64).hex()
-                    # 🔥 AGGIUNGIAMO IL PREFISSO 0:!
-                    trace_id = f"0:{hex_part}"
-                    print(f"[DEBUG] ✅ Trace ID (RAW): {trace_id[:20]}...")
+                    trace_id_hex_for_debug = base64.b64decode(trace_id_b64).hex()
+                    print(f"[DEBUG]    (Hex per debug): {trace_id_hex_for_debug[:30]}...")
                 except Exception as e:
-                    print(f"[DEBUG] ⚠️ Errore decodifica: {e}")
-                    trace_id = trace_id_b64
+                    print(f"[DEBUG]    (Decodifica hex fallita: {e})")
             else:
-                print(f"[DEBUG] ⚠️ No trace ID")
+                print(f"[DEBUG] ⚠️ No trace ID in this transaction")
+                trace_id_for_tonapi = None
+                trace_id_hex_for_debug = None
             
             # 🟢 1. GET SALE DATA - like pytonlib
             print(f"[DEBUG] 🔍 Calling get_sale_data() on {source_address[-12:]}...")
