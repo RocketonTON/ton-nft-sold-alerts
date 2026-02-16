@@ -754,17 +754,15 @@ async def royalty_trs(royalty_address: str):
                         print(f"[DEBUG] ⚠️ NFT address MISSING from stack (API v3 deleted it)")
                                         
                      # 🟢 3. RECOVER NFT ADDRESS - METODO PRINCIPALE: TonAPI
-                    if not nft_address:
+                    if not nft_address and trace_id_for_tonapi:
                         print(f"[DEBUG] 🔍 TENTATIVO RECUPERO NFT via TonAPI...")
-                        # Prima di tutto, dobbiamo ottenere la trace_id dalla transazione
-                        trace_id = await get_trace_id_from_tx(tx) # Chiama la funzione che abbiamo definito
-                        if trace_id:
-                            nft_address = await get_nft_from_trace_via_tonapi(trace_id)
-                            if nft_address:
-                                print(f"[DEBUG] ✅✅✅ NFT RECOVERED via TonAPI! Address: {nft_address[-12:]}")
-                        else:
-                            print(f"[DEBUG] ⚠️ Impossibile ottenere trace_id dalla transazione.")
-
+                        # ✅ Passa il Base64 originale, NON convertito!
+                        nft_address = await get_nft_from_trace_via_tonapi(trace_id_for_tonapi)
+                        if nft_address:
+                            print(f"[DEBUG] ✅✅✅ NFT RECOVERED via TonAPI! Address: {nft_address[-12:]}")
+                    elif not nft_address:
+                        print(f"[DEBUG] ⚠️ Impossibile ottenere trace_id valida per TonAPI.")
+                    
                     # 🟢 4. FALLBACK 1: messaggi transazione (se TonAPI fallisce)
                     if not nft_address:
                         print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction messages (FALLBACK)...")
