@@ -732,38 +732,34 @@ async def royalty_trs(royalty_address: str):
                     else:
                         print(f"[DEBUG] ⚠️ NFT address MISSING from stack (API v3 deleted it)")
                                         
-                                        # 🟢 3. RECOVER NFT ADDRESS - METODO PRINCIPALE: API v2 (NON cancella i dati!)
+                     # 🟢 3. RECOVER NFT ADDRESS - METODO PRINCIPALE: TonAPI
                     if not nft_address:
-                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via API v2...")
-                        nft_address = await get_nft_from_sale_contract_v2(source_address)
-                        if nft_address:
-                            print(f"[DEBUG] ✅✅✅ NFT RECOVERED via v2! Address: {nft_address[-12:]}")
-                    
-                    # 🟢 4. FALLBACK 1: messaggi transazione
+                        print(f"[DEBUG] 🔍 TENTATIVO RECUPERO NFT via TonAPI...")
+                        # Prima di tutto, dobbiamo ottenere la trace_id dalla transazione
+                        trace_id = await get_trace_id_from_tx(tx) # Chiama la funzione che abbiamo definito
+                        if trace_id:
+                            nft_address = await get_nft_from_trace_via_tonapi(trace_id)
+                            if nft_address:
+                                print(f"[DEBUG] ✅✅✅ NFT RECOVERED via TonAPI! Address: {nft_address[-12:]}")
+                        else:
+                            print(f"[DEBUG] ⚠️ Impossibile ottenere trace_id dalla transazione.")
+
+                    # 🟢 4. FALLBACK 1: messaggi transazione (se TonAPI fallisce)
                     if not nft_address:
-                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction messages...")
-                        
-                        nft_address = get_nft_from_transaction_messages(tx)
-                        
+                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction messages (FALLBACK)...")
+                        nft_address = get_nft_from_transaction_messages(tx)  # La tua funzione esistente
                         if nft_address:
                             print(f"[DEBUG] ✅✅✅ NFT RECOVERED from messages! Address: {nft_address[-12:]}")
-                    
-                    # 🟢 5. FALLBACK 2: transaction hash
+
+                    # 🟢 5. FALLBACK 2: transaction hash (se tutto il resto fallisce)
                     if not nft_address:
-                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction hash...")
-                        
+                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction hash (FALLBACK)...")
                         tx_hash_b64 = tx.get('hash')
                         if tx_hash_b64:
-                            print(f"[DEBUG]    Base64 hash: {tx_hash_b64[:20]}...")
-                            
                             try:
                                 import base64
                                 tx_hash_hex = base64.b64decode(tx_hash_b64).hex()
-                                print(f"[DEBUG]    Hex hash: {tx_hash_hex[:16]}...")
-                                print(f"[DEBUG]    Full hex hash: {tx_hash_hex}")
-                                
-                                nft_address = await get_nft_from_transaction_hash(tx_hash_hex)
-                                
+                                nft_address = await get_nft_from_transaction_hash(tx_hash_hex) # La tua funzione
                                 if nft_address:
                                     print(f"[DEBUG] ✅✅✅ NFT RECOVERED from hash! Address: {nft_address[-12:]}")
                                 else:
