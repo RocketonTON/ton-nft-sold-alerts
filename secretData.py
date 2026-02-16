@@ -16,6 +16,7 @@ toncenter_api_key = os.environ.get('TONCENTER_API_KEY', '')
 
 # API Tokens (opzionali)
 cmc_token = os.environ.get('CMC_TOKEN', '')  # CoinMarketCap API (optional)
+tonapi_token = os.environ.get('TONAPI_TOKEN', '') # 🔥 NUOVO: TonAPI Token
 
 # Validate required variables
 if not bot_token:
@@ -24,3 +25,6 @@ if not notify_chat:
     log.error("❌ NOTIFY_CHAT not set in environment variables!")
 if not toncenter_api_key:
     log.warning("⚠️ TONCENTER_API_KEY not set. Using public endpoint with rate limits.")
+if not tonapi_token:
+    log.warning("⚠️ TONAPI_TOKEN not set. TonAPI fallback will have strict rate limits.")
+
