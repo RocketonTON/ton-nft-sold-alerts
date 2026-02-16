@@ -720,16 +720,18 @@ async def royalty_trs(royalty_address: str):
             if trace_id_b64:
                 print(f"[DEBUG] ✅ Trace ID (Base64): {trace_id_b64[:20]}...")
                 
-                # Decodifica Base64 → Hex
                 try:
                     import base64
-                    trace_id = base64.b64decode(trace_id_b64).hex()
-                    print(f"[DEBUG] ✅ Trace ID (Hex): {trace_id[:16]}...")
+                    # Decodifica Base64 → Hex
+                    hex_part = base64.b64decode(trace_id_b64).hex()
+                    # 🔥 AGGIUNGIAMO IL PREFISSO 0:!
+                    trace_id = f"0:{hex_part}"
+                    print(f"[DEBUG] ✅ Trace ID (RAW): {trace_id[:20]}...")
                 except Exception as e:
-                    print(f"[DEBUG] ⚠️ Errore decodifica trace_id: {e}")
-                    trace_id = trace_id_b64  # Fallback all'originale
+                    print(f"[DEBUG] ⚠️ Errore decodifica: {e}")
+                    trace_id = trace_id_b64
             else:
-                print(f"[DEBUG] ⚠️ No trace ID for this transaction")
+                print(f"[DEBUG] ⚠️ No trace ID")
             
             # 🟢 1. GET SALE DATA - like pytonlib
             print(f"[DEBUG] 🔍 Calling get_sale_data() on {source_address[-12:]}...")
