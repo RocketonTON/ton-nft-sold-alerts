@@ -713,6 +713,12 @@ async def royalty_trs(royalty_address: str):
             
             print(f"[DEBUG] ✅ Source address: {source_address[-12:] if source_address else 'None'}")
             print(f"[DEBUG]    Value: {int(in_msg.get('value', 0)) / 1e9:.4f} TON")
+
+            trace_id = tx.get('trace_id')
+            if trace_id:
+                print(f"[DEBUG] ✅ Trace ID: {trace_id[:16]}...")
+            else:
+                print(f"[DEBUG] ⚠️ No trace ID for this transaction")
             
             # 🟢 1. GET SALE DATA - like pytonlib
             print(f"[DEBUG] 🔍 Calling get_sale_data() on {source_address[-12:]}...")
