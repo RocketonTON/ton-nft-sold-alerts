@@ -58,6 +58,7 @@ try:
     from functions import get_nft_from_sale_contract_v2
     from functions import get_trace_id_from_tx
     from functions import get_nft_from_trace_via_tonapi
+    from functions import get_nft_from_transaction_actions
     print("[DEBUG] ✅ functions imported", flush=True)
 except Exception as e:
     print(f"[DEBUG] ❌ functions import failed: {e}", flush=True)
@@ -752,6 +753,15 @@ async def royalty_trs(royalty_address: str):
                         print(f"[DEBUG] ✅ NFT address found in stack: {nft_address[-12:]}")
                     else:
                         print(f"[DEBUG] ⚠️ NFT address MISSING from stack (API v3 deleted it)")
+
+                    # 🟢 3. METODO PRINCIPALE: Cerca in TUTTE le azioni della transazione!
+                    if not nft_address and tx_hash_b64:
+                        print(f"[DEBUG] 🔍 TENTATIVO RECUPERO NFT cercando in TUTTE le azioni...")
+                        nft_address = await get_nft_from_transaction_actions(tx_hash_b64)
+                        if nft_address:
+                            print(f"[DEBUG] ✅✅✅ NFT RECOVERED dalle azioni! Address: {nft_address[-12:]}")
+                    elif not nft_address:
+                        print(f"[DEBUG] ⚠️ Impossibile cercare nelle azioni.")
                                         
                      # 🟢 3. RECOVER NFT ADDRESS - METODO PRINCIPALE: TonAPI
                     if not nft_address and trace_id_for_tonapi:
