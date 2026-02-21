@@ -59,6 +59,7 @@ try:
     from functions import get_trace_id_from_tx
     from functions import get_nft_from_trace_via_tonapi
     from functions import get_nft_from_transaction_actions
+    from functions import get_sale_data_v2
     print("[DEBUG] ✅ functions imported", flush=True)
 except Exception as e:
     print(f"[DEBUG] ❌ functions import failed: {e}", flush=True)
