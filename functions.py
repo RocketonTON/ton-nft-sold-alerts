@@ -689,5 +689,36 @@ async def get_sale_data_v2(address: str) -> Optional[list]:
         print(f"[get_sale_data_v2] ❌ Error: {e}")
         return None
 
+async def get_sale_data_via_tonapi(address: str) -> Optional[list]:
+    """
+    Recupera i dati di vendita usando TonAPI (fallback quando v2 fallisce)
+    """
+    try:
+        from secretData import tonapi_token
+        
+        headers = {
+            "Accept": "application/json",
+        }
+        if tonapi_token:
+            headers["Authorization"] = f"Bearer {tonapi_token}"
+        
+        # TonAPI endpoint per get method
+        url = f"{TONAPI_BASE_URL}/v2/blockchain/accounts/{address}/methods/get_sale_data"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    stack = data.get('stack', [])
+                    if stack:
+                        print(f"[TonAPI] ✅ get_sale_data success! Stack size: {len(stack)}")
+                        return stack
+                else:
+                    print(f"[TonAPI] ❌ Error {response.status}")
+                    return None
+    except Exception as e:
+        print(f"[TonAPI] ❌ Error: {e}")
+        return None
+
 # Alias per retrocompatibilità
 parse_address_from_cell_v3 = parse_address_from_cell
