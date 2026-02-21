@@ -716,8 +716,12 @@ async def royalty_trs(royalty_address: str):
             print(f"[DEBUG]    Value: {int(in_msg.get('value', 0)) / 1e9:.4f} TON")
 
             trace_id_b64 = tx.get('trace_id')
-            trace_id_for_tonapi = None # Questa sarà la variabile da usare per TonAPI
-            trace_id_hex_for_debug = None # Solo per debug
+            trace_id_for_tonapi = None
+            trace_id_hex_for_debug = None
+            trace_id_raw = None
+            
+            # ✅ AGGIUNGI tx_hash_b64 QUI!
+            tx_hash_b64 = tx.get('hash')
 
             if trace_id_b64:
                 print(f"[DEBUG] ✅ Trace ID (Base64 originale): {trace_id_b64[:30]}...")
