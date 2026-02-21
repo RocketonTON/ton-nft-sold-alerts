@@ -583,28 +583,24 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
                 if 'children' in data:
                     print(f"[TonAPI]   Numero children: {len(data['children'])}")
                 
-                # CERCA CON PIÙ VARIANTI DI NOME!
-                def find_nft_transfer_action(transaction_data):
-                    # Controlla le azioni con varianti di nome
-                    for action in transaction_data.get('actions', []):
-                        action_type = action.get('type', '').lower()
-                        
-                        # 🔥 CONTROLLA TUTTE LE VARIANTI POSSIBILI
-                        if any(nft_type in action_type for nft_type in ['nfttransfer', 'nft_transfer', 'nft-transfer', 'nft transfer']):
-                            print(f"[TonAPI] ✅ Trovata azione di tipo: {action.get('type')}")
-                            
-                            # Il campo può essere 'nft_transfer' o 'NFTTransfer' o 'nftTransfer'
-                            nft_data = action.get('nft_transfer') or action.get('NFTTransfer') or action.get('nftTransfer')
-                            if nft_data:
-                                nft_addr = nft_data.get('nft_address') or nft_data.get('address') or nft_data.get('item_address')
-                                if nft_addr:
-                                    return nft_addr
+                    def find_nft_transfer_action(node):
+                    """
+                    Cerca ricorsivamente NFT transfer in un nodo e nei suoi children
+                    """
+                    # 1. CERCA NEL NODO CORRENTE!
+                    if node.get('type') in ['NftTransfer', 'nft_transfer']:
+                        nft_addr = (node.get('nft_transfer', {}).get('nft_address') or 
+                                   node.get('NFTTransfer', {}).get('nft_address') or
+                                   node.get('details', {}).get('nft_address'))
+                        if nft_addr:
+                            return nft_addr
                     
-                    # Cerca nei children
-                    for child in transaction_data.get('children', []):
+                    # 2. CERCA NEI CHILDREN DEL NODO CORRENTE
+                    for child in node.get('children', []):
                         result = find_nft_transfer_action(child)
                         if result:
                             return result
+                    
                     return None
 
                 nft_address = find_nft_transfer_action(data)
