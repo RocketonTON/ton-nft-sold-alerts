@@ -726,8 +726,7 @@ async def royalty_trs(royalty_address: str):
 
             if trace_id_b64:
                 print(f"[DEBUG] ✅ Trace ID (Base64 originale): {trace_id_b64[:30]}...")
-                trace_id_for_tonapi = trace_id_b64  # ✅ Questa è la variabile giusta per TonAPI!
-                # Opzionale: decodifica in hex SOLO per debug visivo
+                trace_id_for_tonapi = trace_id_b64
                 try:
                     import base64
                     trace_id_hex_for_debug = base64.b64decode(trace_id_b64).hex()
@@ -739,14 +738,19 @@ async def royalty_trs(royalty_address: str):
                 trace_id_for_tonapi = None
                 trace_id_hex_for_debug = None
             
-            # 🟢 1. GET SALE DATA - like pytonlib
-            print(f"[DEBUG] 🔍 Calling get_sale_data() on {source_address[-12:]}...")
-            stack = await toncenter_api.run_get_method(source_address, 'get_sale_data')
+            # 🟢 1. GET SALE DATA - PRIMA PROVA CON V2 (dati sempre presenti!)
+            print(f"[DEBUG] 🔍 Calling get_sale_data_v2() on {source_address[-12:]}...")
+            stack = await get_sale_data_v2(source_address)
+            
+            if not stack:
+                # Se v2 fallisce, prova con v3 come fallback
+                print(f"[DEBUG] ⏭️ v2 failed, trying v3...")
+                stack = await toncenter_api.run_get_method(source_address, 'get_sale_data')
             
             if stack:
                 print(f"[DEBUG] ✅ get_sale_data() success! Stack size: {len(stack)}")
                 
-                # 🟢 2. PARSE SALE STACK - like pytonlib
+                # 🟢 2. PARSE SALE STACK
                 sale_data = parse_sale_stack(stack)
                 
                 if sale_data and sale_data[1]:  # is_complete = True (SOLD!)
@@ -757,51 +761,13 @@ async def royalty_trs(royalty_address: str):
                     if nft_address:
                         print(f"[DEBUG] ✅ NFT address found in stack: {nft_address[-12:]}")
                     else:
-                        print(f"[DEBUG] ⚠️ NFT address MISSING from stack (API v3 deleted it)")
-
-                    # 🟢 3. METODO PRINCIPALE: Cerca in TUTTE le azioni della transazione!
-                    if not nft_address and tx_hash_b64:
-                        print(f"[DEBUG] 🔍 TENTATIVO RECUPERO NFT cercando in TUTTE le azioni...")
-                        nft_address = await get_nft_from_transaction_actions(tx_hash_b64)
-                        if nft_address:
-                            print(f"[DEBUG] ✅✅✅ NFT RECOVERED dalle azioni! Address: {nft_address[-12:]}")
-                    elif not nft_address:
-                        print(f"[DEBUG] ⚠️ Impossibile cercare nelle azioni.")
-                                        
-                     # 🟢 3. RECOVER NFT ADDRESS - METODO PRINCIPALE: TonAPI
-                    if not nft_address and trace_id_for_tonapi:
-                        print(f"[DEBUG] 🔍 TENTATIVO RECUPERO NFT via TonAPI...")
-                        # ✅ Passa il Base64 originale, NON convertito!
-                        nft_address = await get_nft_from_trace_via_tonapi(trace_id_for_tonapi)
-                        if nft_address:
-                            print(f"[DEBUG] ✅✅✅ NFT RECOVERED via TonAPI! Address: {nft_address[-12:]}")
-                    elif not nft_address:
-                        print(f"[DEBUG] ⚠️ Impossibile ottenere trace_id valida per TonAPI.")
-                    
-                    # 🟢 4. FALLBACK 1: messaggi transazione (se TonAPI fallisce)
-                    if not nft_address:
-                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction messages (FALLBACK)...")
-                        nft_address = get_nft_from_transaction_messages(tx)  # La tua funzione esistente
-                        if nft_address:
-                            print(f"[DEBUG] ✅✅✅ NFT RECOVERED from messages! Address: {nft_address[-12:]}")
-
-                    # 🟢 5. FALLBACK 2: transaction hash (se tutto il resto fallisce)
-                    if not nft_address:
-                        print(f"[DEBUG] 🔍 ATTEMPTING NFT RECOVERY via transaction hash (FALLBACK)...")
-                        tx_hash_b64 = tx.get('hash')
-                        if tx_hash_b64:
-                            try:
-                                import base64
-                                tx_hash_hex = base64.b64decode(tx_hash_b64).hex()
-                                nft_address = await get_nft_from_transaction_hash(tx_hash_hex) # La tua funzione
-                                if nft_address:
-                                    print(f"[DEBUG] ✅✅✅ NFT RECOVERED from hash! Address: {nft_address[-12:]}")
-                                else:
-                                    print(f"[DEBUG] ❌❌❌ NFT RECOVERY FAILED! No NFT found for this hash")
-                            except Exception as e:
-                                print(f"[DEBUG] ❌ Hash decode error: {e}")
-                        else:
-                            print(f"[DEBUG] ❌ No transaction hash in tx")
+                        print(f"[DEBUG] ⚠️ NFT address MISSING from stack")
+                        
+                        # 🟢 3. FALLBACK: source_address potrebbe essere l'NFT stesso
+                        if len(stack) == 1:
+                            print(f"[DEBUG] 🔍 Stack size 1 - using source_address as NFT address")
+                            nft_address = source_address
+                            print(f"[DEBUG] ✅ NFT address from source: {nft_address[-12:]}")
                     
                     if nft_address:
                         print(f"[DEBUG] 📥 Fetching NFT data for {nft_address[-12:]}...")
@@ -811,7 +777,7 @@ async def royalty_trs(royalty_address: str):
                             collection_address = nft_data[1]
                             print(f"[DEBUG] ✅ NFT data retrieved! Collection: {collection_address[-12:] if collection_address else 'None'}")
                             
-                            # 🟢 5. CHECK MONITORED COLLECTION - like pytonlib
+                            # 🟢 5. CHECK MONITORED COLLECTION
                             if collection_address in collections_list:
                                 print(f"[DEBUG] ✅✅✅ COLLECTION MONITORED! {collection_address[-12:]}")
                                 
@@ -820,7 +786,7 @@ async def royalty_trs(royalty_address: str):
                                 floor_price, floor_link = await get_collection_floor(collection_address)
                                 print(f"[DEBUG]    Floor: {floor_price} TON" if floor_price else "[DEBUG]    Floor: None")
                                 
-                                # 🟢 7. SEND NOTIFICATION - like pytonlib!
+                                # 🟢 7. SEND NOTIFICATION
                                 try:
                                     print(f"[DEBUG] 📨 SENDING TELEGRAM NOTIFICATION...")
                                     await tg_message_async(
