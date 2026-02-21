@@ -617,5 +617,49 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
         print(f"[TonAPI] ❌ Errore: {e}")
         return None
 
+async def get_nft_from_transaction_actions(tx_hash_b64: str) -> Optional[str]:
+    """
+    Cerca l'NFT address in TUTTE le azioni della transazione usando TON Center v3
+    """
+    try:
+        # Decodifica Base64 → Hex
+        tx_hash_hex = base64.b64decode(tx_hash_b64).hex()
+        
+        url = "https://toncenter.com/api/v3/actions"
+        params = {
+            "transaction_hash": tx_hash_hex,
+            "limit": 20  # Per prendere tutte le azioni
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=TONCENTER_HEADERS, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    actions = data.get('actions', [])
+                    
+                    print(f"[get_nft] 🔍 Trovate {len(actions)} azioni in questa transazione")
+                    
+                    for i, action in enumerate(actions):
+                        action_type = action.get('type', '')
+                        print(f"[get_nft]   Azione {i}: {action_type}")
+                        
+                        # Cerca NFT transfer in QUALSIASI azione
+                        if action_type in ['nft_transfer', 'NFTTransfer', 'NftItemTransfer']:
+                            # I dettagli possono essere in posti diversi
+                            details = action.get('details', {})
+                            nft_addr = details.get('nft_address') or details.get('nft')
+                            if nft_addr:
+                                print(f"[get_nft] ✅ NFT trovato nell'azione {i}!")
+                                return nft_addr
+                    
+                    print(f"[get_nft] ⚠️ Nessuna azione NFT in questa transazione")
+                else:
+                    print(f"[get_nft] ❌ Actions API error: {response.status}")
+        
+        return None
+    except Exception as e:
+        print(f"[get_nft] ❌ Errore: {e}")
+        return None
+
 # Alias per retrocompatibilità
 parse_address_from_cell_v3 = parse_address_from_cell
