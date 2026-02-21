@@ -661,5 +661,33 @@ async def get_nft_from_transaction_actions(tx_hash_b64: str) -> Optional[str]:
         print(f"[get_nft] ❌ Errore: {e}")
         return None
 
+async def get_sale_data_v2(address: str) -> Optional[list]:
+    """Chiama get_sale_data usando API v2 (dati SEMPRE presenti!)"""
+    try:
+        # Endpoint v2
+        url = "https://toncenter.com/api/v2/runGetMethod"
+        payload = {
+            "address": address,
+            "method": "get_sale_data",
+            "stack": []
+        }
+        
+        headers = {"accept": "application/json"}
+        if toncenter_api_key:
+            headers["X-API-Key"] = toncenter_api_key
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get('success') and data.get('exit_code') == 0:
+                        stack = data.get('stack', [])
+                        print(f"[get_sale_data_v2] ✅ Stack size: {len(stack)}")
+                        return stack
+        return None
+    except Exception as e:
+        print(f"[get_sale_data_v2] ❌ Error: {e}")
+        return None
+
 # Alias per retrocompatibilità
 parse_address_from_cell_v3 = parse_address_from_cell
