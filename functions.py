@@ -583,7 +583,7 @@ async def get_nft_from_trace_via_tonapi(trace_id: str) -> Optional[str]:
                 if 'children' in data:
                     print(f"[TonAPI]   Numero children: {len(data['children'])}")
                 
-                    def find_nft_transfer_action(node):
+                def find_nft_transfer_action(node):
                     """
                     Cerca ricorsivamente NFT transfer in un nodo e nei suoi children
                     """
