@@ -60,6 +60,7 @@ try:
     from functions import get_nft_from_trace_via_tonapi
     from functions import get_nft_from_transaction_actions
     from functions import get_sale_data_v2
+    from functions import get_sale_data_via_tonapi
     print("[DEBUG] ✅ functions imported", flush=True)
 except Exception as e:
     print(f"[DEBUG] ❌ functions import failed: {e}", flush=True)
@@ -733,6 +734,7 @@ async def royalty_trs(royalty_address: str):
                     print(f"[DEBUG]    (Hex per debug): {trace_id_hex_for_debug[:30]}...")
                 except Exception as e:
                     print(f"[DEBUG]    (Decodifica hex fallita: {e})")
+                
             else:
                 print(f"[DEBUG] ⚠️ No trace ID in this transaction")
                 trace_id_for_tonapi = None
@@ -743,9 +745,9 @@ async def royalty_trs(royalty_address: str):
             stack = await get_sale_data_v2(source_address)
             
             if not stack:
-                # Se v2 fallisce, prova con v3 come fallback
-                print(f"[DEBUG] ⏭️ v2 failed, trying v3...")
-                stack = await toncenter_api.run_get_method(source_address, 'get_sale_data')
+                # Se v2 fallisce, prova con TonAPI come fallback
+                print(f"[DEBUG] ⏭️ v2 failed, trying TonAPI...")
+                stack = await get_sale_data_via_tonapi(source_address)
             
             if stack:
                 print(f"[DEBUG] ✅ get_sale_data() success! Stack size: {len(stack)}")
